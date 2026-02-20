@@ -50,7 +50,8 @@ ALLOWED_HOSTS = [
     'sawfish-premium-unlikely.ngrok-free.app', 
     'strongly-inviting-stinkbug.ngrok-free.app', 
     'normal-elegant-corgi.ngrok-free.app',
-    'tuna-fleet-hamster.ngrok-free.app'
+    'tuna-fleet-hamster.ngrok-free.app',
+    'nannie-halogenous-tidily.ngrok-free.dev'
 ]
 
 # Add Cloud Run domain pattern
@@ -208,7 +209,8 @@ CSRF_TRUSTED_ORIGINS = [
     'https://sawfish-premium-unlikely.ngrok-free.app',
     'https://strongly-inviting-stinkbug.ngrok-free.app',
     'https://healthygatorsportsfan-84ee3c84673f.herokuapp.com',
-    'https://tuna-fleet-hamster.ngrok-free.app'
+    'https://tuna-fleet-hamster.ngrok-free.app',
+    'https://nannie-halogenous-tidily.ngrok-free.dev'
 ]
 
 # Celery configuration

@@ -1,3 +1,3 @@
 export const AppUrls = {
-  url: 'https://tuna-fleet-hamster.ngrok-free.app',
+  url: 'https://nannie-halogenous-tidily.ngrok-free.dev',
 };

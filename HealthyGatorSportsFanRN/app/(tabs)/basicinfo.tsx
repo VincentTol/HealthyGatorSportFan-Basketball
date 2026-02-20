@@ -1,4 +1,5 @@
-import React, { SetStateAction, useState } from 'react';
+import * as React from 'react';
+import { SetStateAction, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -108,26 +109,52 @@ const BasicInformationCollection = () => {
             </View>
 
             <Text style={[styles.label, { color: c.text }]}>Select your birthdate:</Text>
-            <TouchableOpacity
-              style={[styles.input, { justifyContent: 'center' }]}
-              activeOpacity={0.8}
-              onPress={() => setIsVisible(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Pick birthdate"
-            >
-              <Text style={{ color: birthDayStr === 'Enter birthdate' ? c.muted : c.text }}>
-                {birthDayStr}
-              </Text>
-            </TouchableOpacity>
-            <DateTimePickerModal
-              isVisible={isVisible}
-              mode="date"
-              date={birthdate}
-              onConfirm={handleDate}
-              onCancel={() => setIsVisible(false)}
-              minimumDate={new Date(1900, 0, 1)}
-              maximumDate={new Date()}
-            />
+            {Platform.OS === 'web' ? (
+              <View style={[styles.input, { justifyContent: 'center' }]}>
+                {/* @ts-ignore */}
+                <input
+                  type="date"
+                  value={birthdate.toISOString().split('T')[0]}
+                  onChange={(e: any) => {
+                    const d = new Date(e.target.value);
+                    setBirthdate(d);
+                    setBirthDayStr(d.toLocaleDateString());
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    color: birthDayStr === 'Enter birthdate' ? c.muted : c.text,
+                    fontSize: 16,
+                  }}
+                  aria-label="Pick birthdate"
+                />
+              </View>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[styles.input, { justifyContent: 'center' }]}
+                  activeOpacity={0.8}
+                  onPress={() => setIsVisible(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Pick birthdate"
+                >
+                  <Text style={{ color: birthDayStr === 'Enter birthdate' ? c.muted : c.text }}>
+                    {birthDayStr}
+                  </Text>
+                </TouchableOpacity>
+                <DateTimePickerModal
+                  isVisible={isVisible}
+                  mode="date"
+                  date={birthdate}
+                  onConfirm={handleDate}
+                  onCancel={() => setIsVisible(false)}
+                  minimumDate={new Date(1900, 0, 1)}
+                  maximumDate={new Date()}
+                />
+              </>
+            )}
 
             <Text style={[styles.label, { color: c.text }]}>Select your gender:</Text>
             <Dropdown

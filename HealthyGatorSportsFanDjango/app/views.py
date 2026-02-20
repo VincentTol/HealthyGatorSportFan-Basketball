@@ -8,6 +8,7 @@ from rest_framework import status, generics
 from .serializers import UserSerializer, UserDataSerializer, NotificationDataSerializer
 import os
 import cfbd
+import cbbd
 import pytz
 from django.http import JsonResponse
 from datetime import date, datetime, timezone, timedelta
@@ -21,6 +22,7 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+import requests
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -67,33 +69,44 @@ def index(request):
     return render(request, "index.html", context)
 
 def get_cached_uf_games():
-    configuration = cfbd.Configuration(
-        host="https://apinext.collegefootballdata.com",
-        access_token=os.getenv('COLLEGE_FOOTBALL_API_KEY')
-    )
-    apiInstance = cfbd.GamesApi(cfbd.ApiClient(configuration))
-    current_year = date.today().year
-
-    CACHE_KEY = f'uf_football_games_{current_year}'
+    current_year = datetime.now().year
+    CACHE_KEY = f'uf_basketball_games_{current_year}'
     CACHE_TTL = 60 * 60 * 24  # 24 hours in seconds
+    current_date_iso = datetime.combine(date.today(), datetime.min.time()).isoformat() + 'Z'
+    logger.info(f"Fetching UF games for {current_year} starting from {current_date_iso}")
+    end_of_season = "2026-04-15T23:59:59Z" # April 15
 
     games_list = cache.get(CACHE_KEY)
-    
     if games_list is not None:
         logger.info("Cache hit: Returning cached UF games.")
         return games_list
-
+    
     logger.info("Cache miss: Fetching UF games from API.")
     try:
-        games = apiInstance.get_games(year=current_year, team='Florida', conference='SEC')
-        games_list = [game.to_dict() for game in games]
+        # Direct API call using requests
+        url = "https://api.collegebasketballdata.com/games"
+        params = {
+            'startDateRange': current_date_iso,
+            'endDateRange': end_of_season,
+            'team': 'Florida',
+            'conference': 'SEC'
+        }
+        headers = {
+            'Authorization': f'Bearer {os.getenv("COLLEGE_BASKETBALL_API_KEY")}'
+        }
+        response = requests.get(url, params=params, headers=headers)
+        response.raise_for_status()  # Raise error for bad status codes
+        games_data = response.json()  # Should be a list of dicts
+    
         
-        cache.set(CACHE_KEY, games_list, timeout=CACHE_TTL)
-        
-        return games_list
+        cache.set(CACHE_KEY, games_data, timeout=CACHE_TTL)
+        return games_data
+    except requests.RequestException as e:
+        logger.error(f"Error fetching UF games from CBBD API: {e}")
+        return None
     except Exception as e:
-        logger.error(f"Error fetching UF games from CFBD API: {e}")
-        return None 
+        logger.error(f"Unexpected error in get_cached_uf_games: {e}")
+        return None  
 
 # API view to handle POST requests for user creation
 class CreateUserView(APIView):
@@ -451,7 +464,15 @@ def home_tile_view(request):
     
     future_games = []
     for game in all_games:
-        game_start_date = game['startDate'].astimezone(pytz.UTC)
+        # Parse startDate string to datetime if necessary
+        start_date_str = game['startDate']
+        if isinstance(start_date_str, str):
+            # Handle ISO format with 'Z' suffix
+            start_date_str = start_date_str.replace('Z', '+00:00')
+            game_start_date = datetime.fromisoformat(start_date_str)
+        else:
+            game_start_date = start_date_str
+        game_start_date = game_start_date.astimezone(pytz.UTC)
         if game_start_date > today:
             future_games.append((game_start_date, game))
 
@@ -480,6 +501,7 @@ def home_tile_view(request):
 @csrf_exempt
 def schedule_view(request):
     # Fetch all games using the new cached helper
+    logger.info("Entered schedule view")
     games_list = get_cached_uf_games()
 
     if games_list is None:
@@ -487,8 +509,24 @@ def schedule_view(request):
             {"error": f"Could not retrieve UF games for {date.today().year}"},
             status=500
         )
-        
-    return JsonResponse({"data": games_list})
+    
+    future_games = []
+    today = datetime.combine(date.today(), datetime.min.time(), tzinfo=pytz.UTC)
+
+    for game in games_list:
+        # Parse startDate string to datetime if necessary
+        start_date_str = game['startDate']
+        if isinstance(start_date_str, str):
+            # Handle ISO format with 'Z' suffix
+            start_date_str = start_date_str.replace('Z', '+00:00')
+            game_start_date = datetime.fromisoformat(start_date_str)
+        else:
+            game_start_date = start_date_str
+        game_start_date = game_start_date.astimezone(pytz.UTC)
+        if game_start_date > today:
+            future_games.append(game)
+
+    return JsonResponse({"data": future_games})
     
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
