@@ -170,7 +170,7 @@ export default function CreateCredentials() {
 async function registerUser(baseUrl: string, email: string, password: string) {
   const res = await fetch(`${baseUrl}/user/`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...AppUrls.apiHeaders },
     body: JSON.stringify({ email, password })
   });
   const data = await res.json().catch(() => ({}));
@@ -228,20 +228,34 @@ const emailTaken = async (email: string) => {
     try {
         const response = await fetch(`${AppUrls.url}/user/checkemail/`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json',},
+            headers: { 'Content-Type': 'application/json', ...AppUrls.apiHeaders },
             body: JSON.stringify({ email }),
         });
 
-        const data = await response.json();
-        console.log("Email is.....", data);
-        if (data.exists) {
-            console.log("Email exists.....");
+        const text = await response.text();
+        let exists = false;
+        try {
+            const data = JSON.parse(text);
+            exists = !!data.exists;
+        } catch {
+            // Handle non-JSON response (e.g. plain "True"/"False" from some middlewares)
+            const lower = text.trim().toLowerCase();
+            exists = lower === 'true' || lower === '1';
+            if (!exists && text.trim().length > 0) {
+                console.error('Error checking email: server returned non-JSON (is backend/ngrok running?)');
+                Alert.alert('Connection error', 'Could not reach server. Check that Django and ngrok are running.');
+                return true; // Block progress so user retries when connected
+            }
+        }
+        console.log("Email is.....", { exists, text: text.slice(0, 50) });
+        if (exists) {
             Alert.alert('Email already exists', 'Please use a different email address.');
-        } 
-        return data.exists; // Return the boolean value directly
+        }
+        return exists;
     } catch (error) {
         console.error('Error checking email:', error);
-        return false; // Return false in case of an error
+        Alert.alert('Connection error', 'Could not check email. Is the backend running?');
+        return true; // Block progress on error
     }
 };
 

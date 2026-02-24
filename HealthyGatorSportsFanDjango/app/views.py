@@ -7,12 +7,10 @@ from rest_framework.response import Response
 from rest_framework import status, generics
 from .serializers import UserSerializer, UserDataSerializer, NotificationDataSerializer
 import os
-import cfbd
-import cbbd
 import pytz
 from django.http import JsonResponse
 from datetime import date, datetime, timezone, timedelta
-from .utils import send_push_notification_next_game, check_game_status, send_notification, get_users_with_push_token
+from .utils import send_push_notification_next_game, check_game_status_basketball, send_notification, get_users_with_push_token, get_cached_uf_games
 from django.views.decorators.csrf import csrf_exempt
 from django.core.cache import cache
 from .management.commands import poll_cfbd
@@ -67,46 +65,6 @@ def index(request):
         "notification_objs": notification_objs,
     }
     return render(request, "index.html", context)
-
-def get_cached_uf_games():
-    current_year = datetime.now().year
-    CACHE_KEY = f'uf_basketball_games_{current_year}'
-    CACHE_TTL = 60 * 60 * 24  # 24 hours in seconds
-    current_date_iso = datetime.combine(date.today(), datetime.min.time()).isoformat() + 'Z'
-    logger.info(f"Fetching UF games for {current_year} starting from {current_date_iso}")
-    end_of_season = "2026-04-15T23:59:59Z" # April 15
-
-    games_list = cache.get(CACHE_KEY)
-    if games_list is not None:
-        logger.info("Cache hit: Returning cached UF games.")
-        return games_list
-    
-    logger.info("Cache miss: Fetching UF games from API.")
-    try:
-        # Direct API call using requests
-        url = "https://api.collegebasketballdata.com/games"
-        params = {
-            'startDateRange': current_date_iso,
-            'endDateRange': end_of_season,
-            'team': 'Florida',
-            'conference': 'SEC'
-        }
-        headers = {
-            'Authorization': f'Bearer {os.getenv("COLLEGE_BASKETBALL_API_KEY")}'
-        }
-        response = requests.get(url, params=params, headers=headers)
-        response.raise_for_status()  # Raise error for bad status codes
-        games_data = response.json()  # Should be a list of dicts
-    
-        
-        cache.set(CACHE_KEY, games_data, timeout=CACHE_TTL)
-        return games_data
-    except requests.RequestException as e:
-        logger.error(f"Error fetching UF games from CBBD API: {e}")
-        return None
-    except Exception as e:
-        logger.error(f"Unexpected error in get_cached_uf_games: {e}")
-        return None  
 
 # API view to handle POST requests for user creation
 class CreateUserView(APIView):
@@ -421,35 +379,70 @@ class DeleteNotificationView(APIView):
 #
 @csrf_exempt
 def poll_cfbd_view(request):
-    games = get_cached_uf_games()
-    configuration = cfbd.Configuration(
-        host="https://apinext.collegefootballdata.com",
-        access_token=os.getenv('COLLEGE_FOOTBALL_API_KEY')
-    )
-    apiInstance = cfbd.GamesApi(cfbd.ApiClient(configuration))
-    CACHE_KEY = "completed_game"
-    CACHE_TTL = 60 * 60 * 4 #4 hours -> there won't be more than 1 game/day or /week so this should be fine
+    try:
+        # Test mode: ?test_live=1 or ?test_live=true runs live score check for any team (no schedule window).
+        # Use ?team=Kentucky to check that team (otherwise uses CURR_TEAM from env).
+        test_live = request.GET.get("test_live", "").lower() in ("1", "true", "yes")
+        team_override = (request.GET.get("team") or "").strip() or None
 
-    for game in games:
-        start_date = game['startDate']
+        if test_live:
+            logger.info("poll_cfbd_view: test_live=1, team=%s", team_override or "CURR_TEAM from env")
+            game_status, home_team, home_score, away_team, away_score, game_completion_status = check_game_status_basketball(curr_team_override=team_override)
+            return JsonResponse({
+                "status": "ok",
+                "message": "Live score check (test mode).",
+                "game_status": game_status,
+                "home_team": home_team,
+                "home_score": home_score,
+                "away_team": away_team,
+                "away_score": away_score,
+                "game_completion_status": game_completion_status,
+            })
 
-        if start_date - timedelta(hours=0, minutes=30) <= datetime.now(timezone.utc) <= start_date + timedelta(hours=4, minutes=0): #30 minutes before game start -> 4 hours after game end
-            print(f"Game {game} is within the 4 hour window")
-            
-            game_status, home_team, home_score, away_team, away_score, game_completion_status = check_game_status(apiInstance)
-            send_notification(game_status, home_team, home_score, away_team, away_score)
+        games = get_cached_uf_games() or []
+        CACHE_KEY = "completed_game"
+        CACHE_TTL = 60 * 60 * 4  # 4 hours
+        now = datetime.now(timezone.utc)
 
-            if game_completion_status == "completed":
-                existingGame = cache.get(CACHE_KEY)
-                if existingGame is None:
-                    pushTokens = get_users_with_push_token()
-                    message = "Finished the game? Help the HealthyGator community by going to the app home page and taking a post-game survey!"
-                    send_push_notification_next_game('Post-Game Survey', pushTokens, message)
-                    cache.set(CACHE_KEY, "", CACHE_TTL)
+        for game in games:
+            start_date_raw = game.get('startDate') or game.get('start_date')
+            if start_date_raw is None:
+                continue
+            if isinstance(start_date_raw, str):
+                start_date_str = start_date_raw.replace('Z', '+00:00')
+                start_date = datetime.fromisoformat(start_date_str)
+            else:
+                start_date = start_date_raw
+            if start_date.tzinfo is None:
+                start_date = start_date.replace(tzinfo=timezone.utc)
+            if start_date - timedelta(hours=0, minutes=30) <= now <= start_date + timedelta(hours=4, minutes=0):
+                logger.info("Game %s is within the 4 hour window", game)
+                game_status, home_team, home_score, away_team, away_score, game_completion_status = check_game_status_basketball()
+                send_notification(game_status, home_team, home_score, away_team, away_score)
 
-            return
+                if game_completion_status == "completed":
+                    existingGame = cache.get(CACHE_KEY)
+                    if existingGame is None:
+                        pushTokens = get_users_with_push_token()
+                        message = "Finished the game? Help the HealthyGator community by going to the app home page and taking a post-game survey!"
+                        send_push_notification_next_game('Post-Game Survey', pushTokens, message)
+                        cache.set(CACHE_KEY, "", CACHE_TTL)
 
-    print("No games are inside window")
+                return JsonResponse({
+                    "status": "ok",
+                    "message": "Game in window; notification sent.",
+                    "game_status": game_status,
+                    "home_team": home_team,
+                    "home_score": home_score,
+                    "away_team": away_team,
+                    "away_score": away_score,
+                })
+
+        logger.info("No games in 30min-before to 4hr-after window.")
+        return JsonResponse({"status": "ok", "message": "No games in window."})
+    except Exception as e:
+        logger.exception("poll_cfbd_view error")
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 @csrf_exempt
 def home_tile_view(request):

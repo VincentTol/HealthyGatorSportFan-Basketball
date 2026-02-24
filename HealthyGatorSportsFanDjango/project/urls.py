@@ -58,6 +58,7 @@ urlpatterns = [
     path('notificationdata/delete/<int:notification_id>/', DeleteNotificationView.as_view(), name='notification-delete'),
     path('notificationdata/deleteall/<int:user_id>/', BulkDeleteNotificationsView.as_view(), name='notifications-delete-all'),
     path('poll-cfbd/', poll_cfbd_view, name='poll_cfbd'),
+    path('poll_cfbd/', poll_cfbd_view, name='poll_cfbd_alias'),
     path('home-tile/', home_tile_view, name='home_tile_view'),
     path('schedule-tile/', schedule_view, name='schedule_tile'),
     
