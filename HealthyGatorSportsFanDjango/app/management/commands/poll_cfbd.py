@@ -1,41 +1,31 @@
-import os
-import cfbd
-import pytz
-from cfbd.models import ScoreboardGame
 from django.core.management.base import BaseCommand
-from datetime import date, datetime
-from app.utils import send_push_notification_next_game, check_game_status, send_notification
+from datetime import datetime, timezone, timedelta
+from app.utils import check_game_status_basketball, send_notification, get_cached_uf_games
 
 
 class Command(BaseCommand):
-    help = 'Polls CFBD API for game updates'
+    help = 'Polls NCAA basketball API for game updates (replaces CFBD football poll)'
 
     def handle(self, *args, **options):
-        self.poll_cfbd()
+        self.poll_cbb()
 
-    def poll_cfbd(self):
-        configuration = cfbd.Configuration(
-            host="https://apinext.collegefootballdata.com",
-            access_token=os.getenv('COLLEGE_FOOTBALL_API_KEY')
-        )
-        apiInstance = cfbd.GamesApi(cfbd.ApiClient(configuration))
-        next_game = self.get_next_game()
-        if next_game:
-            user_tz = pytz.timezone('America/New_York')  # TODO: Get user's timezone from database
-            game_time = next_game.start_date.astimezone(user_tz)
-            print(f"Teams: {next_game.home_team} vs {next_game.away_team}")
-            print(f"Date: {game_time.strftime('%m-%d-%Y %I:%M %p')}")
-        else:
-            print("No upcoming games found.")
-        game_status = check_game_status(apiInstance)
-        send_notification(game_status)
-
-
-    def get_next_game(self):
-        # TODO: Test games that occur in 2025 but still happen in 2024 season
-        current_year = date.today().year
-        games = self.apiInstance.get_games(year=current_year, team='Florida', conference='SEC')
-        today = datetime.combine(date.today(), datetime.min.time())
-        future_games = [game for game in games if game.start_date.replace(tzinfo=None) > today]
-        return min(future_games, key=lambda x: x.start_date) if future_games else None
+    def poll_cbb(self):
+        games = get_cached_uf_games() or []
+        now = datetime.now(timezone.utc)
+        for game in games:
+            raw = game.get('startDate') or game.get('start_date')
+            if not raw:
+                continue
+            if isinstance(raw, str):
+                start_date = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+            else:
+                start_date = raw
+            if start_date.tzinfo is None:
+                start_date = start_date.replace(tzinfo=timezone.utc)
+            if start_date - timedelta(minutes=30) <= now <= start_date + timedelta(hours=4):
+                self.stdout.write(f"Game in window: {game}")
+                game_status, home_team, home_score, away_team, away_score, _ = check_game_status_basketball()
+                send_notification(game_status, home_team, home_score, away_team, away_score)
+                return
+        self.stdout.write("No games in 30min-before to 4hr-after window.")
 

@@ -35,7 +35,7 @@ PORT = os.getenv('PORT', '8000')
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY')
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key-change-in-production-w5z(goyrw+i*qgn)76$!d#5(#+t49e^_blfqp5!rrkf^#=vb+p')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
@@ -50,7 +50,10 @@ ALLOWED_HOSTS = [
     'sawfish-premium-unlikely.ngrok-free.app', 
     'strongly-inviting-stinkbug.ngrok-free.app', 
     'normal-elegant-corgi.ngrok-free.app',
-    'tuna-fleet-hamster.ngrok-free.app'
+    'tuna-fleet-hamster.ngrok-free.app',
+    'nannie-halogenous-tidily.ngrok-free.dev',
+    'nonparabolical-unwaddling-blaise.ngrok-free.dev',
+    # Add your current ngrok host here when you run: ngrok http 8000
 ]
 
 # Add Cloud Run domain pattern
@@ -144,17 +147,25 @@ if os.getenv('K_SERVICE'):
         }
     }
 else:
-    # Local development database
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.getenv('DATABASE_NAME'),
-            'USER': os.getenv('DATABASE_USER'),
-            'PASSWORD': os.getenv('DATABASE_PASSWORD'),
-            'HOST': os.getenv('DATABASE_HOST', 'localhost'),
-            'PORT': os.getenv('DATABASE_PORT', '5432'),
+    # Local development: use PostgreSQL if DATABASE_NAME is set, else SQLite (no .env DB vars needed)
+    if os.getenv('DATABASE_NAME'):
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': os.getenv('DATABASE_NAME'),
+                'USER': os.getenv('DATABASE_USER'),
+                'PASSWORD': os.getenv('DATABASE_PASSWORD'),
+                'HOST': os.getenv('DATABASE_HOST', 'localhost'),
+                'PORT': os.getenv('DATABASE_PORT', '5432'),
+            }
         }
-    }
+    else:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -208,7 +219,8 @@ CSRF_TRUSTED_ORIGINS = [
     'https://sawfish-premium-unlikely.ngrok-free.app',
     'https://strongly-inviting-stinkbug.ngrok-free.app',
     'https://healthygatorsportsfan-84ee3c84673f.herokuapp.com',
-    'https://tuna-fleet-hamster.ngrok-free.app'
+    'https://tuna-fleet-hamster.ngrok-free.app',
+    'https://nannie-halogenous-tidily.ngrok-free.dev'
 ]
 
 # Celery configuration
@@ -234,18 +246,27 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
-# Redis cache configuration
-if os.getenv('K_SERVICE'):
-    REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-else:
-    REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+# Cache: use Redis if django_redis is installed; otherwise in-memory (tests/local dev without Redis)
+try:
+    import django_redis  # noqa: F401
+    _redis_available = True
+except ImportError:
+    _redis_available = False
 
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': REDIS_URL,
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+if _redis_available:
+    REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            }
         }
     }
-}
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        }
+    }

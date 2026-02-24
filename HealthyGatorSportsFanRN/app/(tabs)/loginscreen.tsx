@@ -163,7 +163,7 @@ const getLatestUserData = async (currentUser: any, navigation: any, accessToken?
     const token = accessToken || (await getAccess());
     const response = await fetch(`${AppUrls.url}/userdata/latest/${currentUser.userId}/`, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...AppUrls.apiHeaders },
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     });
 

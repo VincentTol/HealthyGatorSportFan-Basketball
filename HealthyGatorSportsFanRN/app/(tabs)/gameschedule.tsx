@@ -201,11 +201,14 @@ function NavigateToProfileManagement(currentUser: any, navigation: any) {
 
 export const getSchedule = async () => {
   try {
+    console.log("Fetching game schedule from API...");
     const response = await fetch(`${AppUrls.url}/schedule-tile/`, {
-      method: "GET",
+      method: "POST",
       headers: { Accept: "application/json", "Content-Type": "application/json" },
     });
+    console.log("response:  ", response);
     const data = await response.json();
+    console.log("data:  ", data);
     if (response.ok) return data;
   } catch (error) {
     console.log("Encountered error while retrieving game schedule: ", error);
