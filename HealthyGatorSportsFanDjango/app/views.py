@@ -23,7 +23,6 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 
 import logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
@@ -103,7 +102,7 @@ class CreateUserView(APIView):
             request_body=UserSerializer
         )
     def post(self, request):
-        print("request.data for CreateUserView: ", request.data)
+        logger.debug("CreateUserView POST payload: %s", request.data)
         serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
@@ -120,13 +119,13 @@ class UserUpdateView(APIView):
             user = User.objects.get(user_id=user_id)
         except User.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        print("request.data for UserUpdateView: ", request.data)
+        logger.debug("UserUpdateView PUT payload for user_id=%s: %s", user_id, request.data)
         serializer = UserSerializer(user, data=request.data, partial=True)  # Allow partial updates
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         else:
-            print(serializer.errors)  # Debugging line
+            logger.warning("UserUpdateView validation errors for user_id=%s: %s", user_id, serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class CheckEmailView(APIView):
@@ -358,7 +357,7 @@ class NotificationListView(generics.ListAPIView):
 class BulkDeleteNotificationsView(APIView):
     @swagger_auto_schema(operation_summary="Delete all notifications for a user", operation_description="Delete all notifications for a user by user ID", request_body=NotificationDataSerializer)
     def delete(self, request, user_id):
-        print("Entered BulkDeleteNotifications View")  
+        logger.info("BulkDeleteNotificationsView called for user_id=%s", user_id)
         try:
             notifications = NotificationData.objects.filter(user_id=user_id)
             deleted_count, _ = notifications.delete()
@@ -366,9 +365,9 @@ class BulkDeleteNotificationsView(APIView):
                 return Response({'message': f'Deleted {deleted_count} notifications.'}, status=status.HTTP_200_OK)
             else:
                 return Response({'message': 'No notifications found for this user.'}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            print("Errors:", e)
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            logger.exception("BulkDeleteNotificationsView error for user_id=%s", user_id)
+            return Response({"error": "Failed to delete notifications."}, status=status.HTTP_400_BAD_REQUEST)
                 
 # API view to handle CRUD requests for a single notification
 class CreateNotificationView(APIView):
@@ -421,7 +420,7 @@ def poll_cfbd_view(request):
         start_date = game['startDate']
 
         if start_date - timedelta(hours=0, minutes=30) <= datetime.now(timezone.utc) <= start_date + timedelta(hours=4, minutes=0): #30 minutes before game start -> 4 hours after game end
-            print(f"Game {game} is within the 4 hour window")
+            logger.info("Game %s is within the 4 hour window", game)
             
             game_status, home_team, home_score, away_team, away_score, game_completion_status = check_game_status(apiInstance)
             send_notification(game_status, home_team, home_score, away_team, away_score)
@@ -436,7 +435,7 @@ def poll_cfbd_view(request):
 
             return
 
-    print("No games are inside window")
+    logger.info("No games are inside window")
 
 @csrf_exempt
 def home_tile_view(request):
@@ -507,8 +506,7 @@ def me_view(request):
     except User.DoesNotExist:
         return Response({"detail": "App user not found"}, status=404)
 
+    data = UserSerializer(app_user).data
+    logger.debug("me_view returned profile for email=%s user_id=%s", email, data.get("user_id"))
 
-    print('hell yeah brother')
-    print(UserSerializer(app_user).data)
-
-    return Response(UserSerializer(app_user).data, status=200)
+    return Response(data, status=200)

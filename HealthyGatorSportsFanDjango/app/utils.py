@@ -5,6 +5,9 @@ import redis
 from .models import User, NotificationData
 from .serializers import UserSerializer
 from django.core.cache import cache
+import logging
+
+logger = logging.getLogger(__name__)
 
 def send_push_notification_next_game(header, users, message):
     sentTokens = set()
@@ -28,10 +31,8 @@ def send_push_notification_next_game(header, users, message):
             )
 
             
-        except Exception as e:
-            errorMessage = "Couldn't send push notification"
-            print(errorMessage)
-            print(e)
+        except Exception:
+            logger.exception("Couldn't send push notification for header=%s", header)
 
 def get_users_with_push_token():
     uniqueTokens = set()
@@ -102,10 +103,17 @@ def send_notification(game_status: str, home_team: str, home_score: int, away_te
             'Game not started': "The game hasn't started yet. Get ready to meet your health goals when it does!",
             'No game found': ''
         }[game_status]
-        print(f"Game status: {game_status}")
+        logger.info(
+            "send_notification: status=%s home=%s(%s) away=%s(%s)",
+            game_status,
+            home_team,
+            home_score,
+            away_team,
+            away_score,
+        )
         current_score = f"{home_score}-{away_score}"
         last_score = cache.get('last_score')
-        print(f"Last score: {last_score}")
+        logger.debug("send_notification: last_score_cache_value=%s", last_score)
         if game_status == 'No game found':
             return
         else:

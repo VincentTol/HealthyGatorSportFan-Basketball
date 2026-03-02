@@ -249,3 +249,42 @@ CACHES = {
         }
     }
 }
+
+# Logging configuration
+# Use LOG_LEVEL env var if set (e.g. DEBUG, INFO, WARNING), default to INFO.
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {name} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '[{levelname}] {name}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        # Django's own logs
+        'django': {
+            'handlers': ['console'],
+            'level': LOG_LEVEL,
+            'propagate': True,
+        },
+        # Our app code (e.g. app.views, app.utils, app.tasks)
+        'app': {
+            'handlers': ['console'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+    },
+}
