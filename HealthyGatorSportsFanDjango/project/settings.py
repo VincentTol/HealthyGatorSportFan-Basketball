@@ -53,6 +53,7 @@ ALLOWED_HOSTS = [
     'tuna-fleet-hamster.ngrok-free.app',
     'nannie-halogenous-tidily.ngrok-free.dev',
     'nonparabolical-unwaddling-blaise.ngrok-free.dev',
+    'interprofessionally-nonappeasable-garfield.ngrok-free.dev'
     # Add your current ngrok host here when you run: ngrok http 8000
 ]
 
@@ -220,7 +221,8 @@ CSRF_TRUSTED_ORIGINS = [
     'https://strongly-inviting-stinkbug.ngrok-free.app',
     'https://healthygatorsportsfan-84ee3c84673f.herokuapp.com',
     'https://tuna-fleet-hamster.ngrok-free.app',
-    'https://nannie-halogenous-tidily.ngrok-free.dev'
+    'https://nannie-halogenous-tidily.ngrok-free.dev',
+    'https://interprofessionally-nonappeasable-garfield.ngrok-free.dev'
 ]
 
 # Celery configuration

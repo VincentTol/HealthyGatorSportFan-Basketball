@@ -51,11 +51,11 @@ SECRET_KEY=$secretKey
 DEBUG=True
 DATABASE_NAME=healthygatorsportsfan
 DATABASE_USER=postgres
-DATABASE_PASSWORD=your_password_here
+DATABASE_PASSWORD=password
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 "@
-    $envContent | Out-File -FilePath $envPath -Encoding UTF8
+    [System.IO.File]::WriteAllLines($envPath, $envContent)
     Write-Host "[OK] .env file created"
     Write-Host "[WARN] Update DATABASE_USER and DATABASE_PASSWORD in .env"
 } else {
