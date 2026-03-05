@@ -10,7 +10,7 @@ import os
 import pytz
 from django.http import JsonResponse
 from datetime import date, datetime, timezone, timedelta
-from .utils import send_push_notification_next_game, check_game_status_basketball, send_notification, get_users_with_push_token, get_cached_uf_games
+from .utils import send_push_notification_next_game, check_game_status_basketball, send_notification, get_users_with_push_token, get_cached_uf_games, get_gators_basketball_news
 from django.views.decorators.csrf import csrf_exempt
 from django.core.cache import cache
 from .management.commands import poll_cfbd
@@ -520,7 +520,16 @@ def schedule_view(request):
             future_games.append(game)
 
     return JsonResponse({"data": future_games})
-    
+
+
+def news_view(request):
+    """GET: Return Florida Gators basketball news (Google News RSS, cached). No auth required."""
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+    articles = get_gators_basketball_news()
+    return JsonResponse({"data": articles})
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def me_view(request):
