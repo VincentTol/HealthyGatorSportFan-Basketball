@@ -35,6 +35,9 @@ Add \android to .gitignore in RN folder
 -npx expo-doctor
 	Should now pass all checks
 
+
+Instructions to test a notification
+
 Run frontend and backend
 If frontend terminal says "Using Development build" press S to switch to expo go
 Install expo go app on phone, and login
@@ -52,7 +55,7 @@ cache.delete('last_score')
 
 # 2. Mock the token retrieval temporarily
 def mock_get_tokens():
-    return [{'push_token': 'ExponentPushToken[PJ8BHMHao1_nuv48oW26pG]', 'user_id': 1}]
+    return [{'push_token': 'ExponentPushToken[YOUR_COPIED_TOKEN]', 'user_id': 1}]
 
 # 3. Temporarily override the function for this test session
 import app.utils
