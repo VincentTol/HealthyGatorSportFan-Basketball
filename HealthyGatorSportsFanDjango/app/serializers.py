@@ -82,25 +82,74 @@ class UserSerializer(serializers.ModelSerializer):
 class UserDataSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserData
-        fields = ['data_id', 'user', 'timestamp', 'goal_type', 'weight_value', 'feel_better_value']        
+        fields = [
+            'data_id',
+            'user',
+            'timestamp',
+            'goal_type',
+            'weight_value',
+            'feel_better_value',
+            'excitement',
+            'frustration',
+            'anger',
+            'question_answers',
+        ]
         extra_kwargs = {
             'goal_type': {'required': False},
             'weight_value': {'required': False, 'default': 0.0},
-            'feel_better_value': {'required': False, 'default': 0.0}
+            'feel_better_value': {'required': False, 'default': 0.0},
+            'excitement': {'required': False},
+            'frustration': {'required': False},
+            'anger': {'required': False},
+            'question_answers': {'required': False, 'default': list},
         }
 
+    def _validate_emotion_value(self, emotion_name, value):
+        if value in (None, ''):
+            return None
+        if not isinstance(value, int):
+            raise serializers.ValidationError(f'{emotion_name} must be an integer.')
+        if value < 1 or value > 10:
+            raise serializers.ValidationError(f'{emotion_name} must be between 1 and 10.')
+        return value
+
+    def validate_excitement(self, value):
+        return self._validate_emotion_value('excitement', value)
+
+    def validate_frustration(self, value):
+        return self._validate_emotion_value('frustration', value)
+
+    def validate_anger(self, value):
+        return self._validate_emotion_value('anger', value)
+    def _validate_question_item(self, item):
+        if not isinstance(item, dict):
+            raise serializers.ValidationError('Each question item must be an object.')
+        required_fields = ['question_id', 'question', 'answer']
+        for required_field in required_fields:
+            if required_field not in item:
+                raise serializers.ValidationError(f"Each question item must include '{required_field}'.")
+            if isinstance(item[required_field], str) and not item[required_field].strip():
+                raise serializers.ValidationError(f"'{required_field}' cannot be empty.")
+        return item
+    def validate_question_answers(self, value):
+        if value in (None, ''):
+            return []
+        if not isinstance(value, list):
+            raise serializers.ValidationError('question_answers must be a list of question objects.')
+        return [self._validate_question_item(item) for item in value]
+
     def create(self, validated_data):
-        return UserData.objects.create(
-            goal_type=validated_data['goal_type'],
-            weight_value=validated_data['weight_value'],
-            feel_better_value=validated_data['feel_better_value'],
-        )
+        return UserData.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
         # Update fields when new data comes from the basicinfo.tsx screen
         instance.goal_type = validated_data.get('goal_type', instance.goal_type)
         instance.weight_value = validated_data.get('weight_value', instance.weight_value)
         instance.feel_better_value = validated_data.get('feel_better_value', instance.feel_better_value)
+        instance.excitement = validated_data.get('excitement', instance.excitement)
+        instance.frustration = validated_data.get('frustration', instance.frustration)
+        instance.anger = validated_data.get('anger', instance.anger)
+        instance.question_answers = validated_data.get('question_answers', instance.question_answers)
         instance.save()
         return instance
     

@@ -1,0 +1,17 @@
+[
+  {
+    "question_id": "positive_moment",
+    "question": "Thinking about the past UF basketball games you've watched recently, what moment stood out to you in a positive or exciting way?",
+    "min_chars": 12
+  },
+  {
+    "question_id": "struggles_or_mistakes",
+    "question": "Do you feel like the UF basketball team has kept struggling or making mistakes? What happened? How did it make you feel?",
+    "min_chars": 12
+  },
+  {
+    "question_id": "upset_decision_or_action",
+    "question": "Was there anything/anyone during a recent game that made you upset about a decision or action? How did it make you feel?",
+    "min_chars": 12
+  }
+]
