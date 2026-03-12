@@ -222,17 +222,18 @@ class AnalyzeProgressTextView(APIView):
 
 class LatestUserDataView(APIView):
     @swagger_auto_schema(
-        operation_summary="Get latest user progress", operation_description="Get the latest entry of user's progress from the userData table.",
+        operation_summary="Get latest user progress",
+        operation_description="Get the latest entry of user's progress from the userData table.",
         manual_parameters=[
             openapi.Parameter(
-                'user_id',  # Name of the parameter
-                openapi.IN_PATH,  # Location of the parameter
+                'user_id',
+                openapi.IN_PATH,
                 description="User ID for which we are getting the latest user data entry for",
-                type=openapi.TYPE_STRING,  # Type of the parameter
-                required=True  # Whether the parameter is required
+                type=openapi.TYPE_STRING,
+                required=True,
             )
         ],
-        responses={200: UserDataSerializer(many=True)}  # Define response schema
+        responses={200: UserDataSerializer(many=True)},
     )
     def get(self, request, user_id):
         try:
@@ -240,10 +241,34 @@ class LatestUserDataView(APIView):
             if recent_data:
                 serializer = UserDataSerializer(recent_data)
                 return Response(serializer.data, status=status.HTTP_200_OK)
-            else:
-                return Response({"message": "No data found for this user."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": "No data found for this user."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AllUserDataView(generics.ListAPIView):
+    serializer_class = UserDataSerializer
+
+    @swagger_auto_schema(
+        operation_summary="Get all user progress",
+        operation_description="Get all userData entries for a user, ordered by newest first.",
+        manual_parameters=[
+            openapi.Parameter(
+                'user_id',
+                openapi.IN_PATH,
+                description="User ID for which we are getting all user data entries",
+                type=openapi.TYPE_STRING,
+                required=True,
+            )
+        ],
+        responses={200: UserDataSerializer(many=True)},
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        user_id = self.kwargs['user_id']
+        return UserData.objects.filter(user_id=user_id).order_by('-timestamp')
 
 # # API view to handle POST requests for data sent from the front-end (basicinfo.tsx)
 # class BasicInfoView(APIView):
