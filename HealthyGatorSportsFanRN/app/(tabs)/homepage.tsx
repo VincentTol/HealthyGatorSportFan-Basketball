@@ -191,6 +191,13 @@ export default function HomePage() {
             </TouchableOpacity>
           </View>
 
+          <TouchableOpacity
+            style={[styles.quickBtn, styles.newsBtn]}
+            onPress={() => NavigateToGatorsNews(currentUser, navigation)}
+          >
+            <Text style={styles.quickText}>Gators News</Text>
+          </TouchableOpacity>
+
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Your Goal</Text>
             <View style={styles.underline} />
@@ -317,6 +324,9 @@ export default function HomePage() {
 }
 function NavigateToGameSchedule(currentUser: any, navigation: any) {
   navigation.navigate('GameSchedule', { currentUser } as never);
+}
+function NavigateToGatorsNews(currentUser: any, navigation: any) {
+  navigation.navigate('GatorsNews', { currentUser } as never);
 }
 function NavigateToNotifications(currentUser: any, navigation: any) {
   navigation.navigate('NotificationsPage', { currentUser } as never);
@@ -513,6 +523,12 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
     alignItems: 'center',
+  },
+  newsBtn: {
+    flex: 0,
+    width: '100%',
+    marginTop: 8,
+    backgroundColor: '#0B3D91',
   },
   quickText: { color: '#fff', fontWeight: '900', letterSpacing: 0.2 },
 

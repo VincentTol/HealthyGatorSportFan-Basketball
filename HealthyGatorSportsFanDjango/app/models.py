@@ -47,6 +47,10 @@ class UserData(models.Model):
     goal_type = models.CharField(max_length=20, choices=[('loseWeight', 'Lose Weight'), ('feelBetter', 'Feel Better'), ('both', 'Both')]) # The first value is the value stored in the DB, and the second value is the label displayed on the UI
     weight_value = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True)  # Weight in pounds (optional, depends on goal type)
     feel_better_value = models.IntegerField(null=True, blank=True)  # Scale of 1 to 5 (optional, depends on goal type)
+    excitement = models.IntegerField(null=True, blank=True)
+    frustration = models.IntegerField(null=True, blank=True)
+    anger = models.IntegerField(null=True, blank=True)
+    question_answers = models.JSONField(default=list, blank=True)
 
     # When an instance is referenced, prints the user name and timestamp instead of the default "User object (1)"
     def __str__(self):

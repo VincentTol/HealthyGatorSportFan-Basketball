@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,6 +7,7 @@ import {
   Image,
   Alert,
   ScrollView,
+  TextInput,
   Platform,
   StatusBar,
 } from 'react-native';
@@ -16,6 +17,7 @@ import StarRating from 'react-native-star-rating-widget';
 
 import User from '@/components/user';
 import { AppUrls } from '@/constants/AppUrls';
+import { DEFAULT_PROGRESS_QUESTIONS, ProgressQuestion } from '@/constants/ProgressQuestions';
 import GlobalStyles from '../styles/GlobalStyles';
 import { clearTokens } from "@/components/tokenStorage";
 
@@ -32,12 +34,39 @@ export default function ProgressLogging() {
 
   const [newWeight, setNewWeight] = useState(Math.floor(currentUser.currentWeight));
   const [rating, setRating] = useState(0);
+  const [questions, setQuestions] = useState<ProgressQuestion[]>(DEFAULT_PROGRESS_QUESTIONS);
+  const [questionAnswers, setQuestionAnswers] = useState<Record<string, string>>({});
 
   const [isGoalToLoseWeight] = useState(currentUser.loseWeight);
   const [isGoalToFeelBetter] = useState(currentUser.feelBetter);
 
+  useEffect(() => {
+    const loadQuestionBank = async () => {
+      try {
+        const response = await fetch(`${AppUrls.url}/userdata/questions/`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json', ...AppUrls.apiHeaders },
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+        const serverQuestions = data?.questions;
+        if (Array.isArray(serverQuestions) && serverQuestions.length > 0) {
+          setQuestions(serverQuestions);
+        }
+      } catch {
+      }
+    };
+
+    loadQuestionBank();
+  }, []);
+
   function dataEntered(): boolean {
     if (rating !== 0) return true;
+    if (Object.keys(questionAnswers).length > 0) return true;
     return newWeight !== currentUser.currentWeight;
   }
   usePreventRemove(dataEntered(), () => {});
@@ -75,6 +104,7 @@ export default function ProgressLogging() {
             <Text style={styles.cardTitle}>Enter New Weight:</Text>
             <View style={styles.orangeBar} />
 
+            {/* Weight input with plus and minus buttons */}
             <View style={styles.row}>
               <TouchableOpacity
                 style={styles.circleBtn}
@@ -101,6 +131,7 @@ export default function ProgressLogging() {
           <Text style={styles.goalText}>Your goal: {Math.floor(currentUser.goalWeight)}</Text>
         )}
 
+        {/* Feeling input with star rating */}
         {isGoalToFeelBetter && (
           <View style={[styles.card, { marginTop: 18 }]}>
             <Text style={styles.cardTitle}>How are you feeling?</Text>
@@ -114,15 +145,42 @@ export default function ProgressLogging() {
           </View>
         )}
 
+        <View style={[styles.card, { marginTop: 18 }]}>
+          <Text style={styles.cardTitle}>Daily Questions</Text>
+          <View style={styles.orangeBar} />
+
+          {questions.map((questionItem) => (
+            <View key={questionItem.question_id} style={styles.questionBlock}>
+              <Text style={styles.questionText}>{questionItem.question}</Text>
+              <TextInput
+                style={styles.answerInput}
+                multiline
+                value={questionAnswers[questionItem.question_id] || ''}
+                onChangeText={(text) =>
+                  setQuestionAnswers((prev) => ({
+                    ...prev,
+                    [questionItem.question_id]: text,
+                  }))
+                }
+                placeholder="Type your answer"
+                placeholderTextColor="#98A2B3"
+              />
+              <Text style={styles.minCharHint}>Min chars: {questionItem.min_chars}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Submit button */}
         <TouchableOpacity
           style={[GlobalStyles.confirmButton, styles.cta]}
           activeOpacity={0.8}
-          onPress={() => ConfirmChanges(navigation, rating, newWeight, currentUser)}
+          onPress={() => ConfirmChanges(navigation, rating, newWeight, currentUser, questions, questionAnswers)}
         >
           <Text style={styles.ctaText}>Submit Assessment</Text>
         </TouchableOpacity>
       </ScrollView>
 
+      {/* Bottom navigation bar */}
       <View
         onLayout={(e) => setBottomH(e.nativeEvent.layout.height)}
         style={[GlobalStyles.bottomMenu, { paddingBottom: insets.bottom }]}
@@ -183,7 +241,14 @@ export default function ProgressLogging() {
   );
 }
 
-function ConfirmChanges(navigation: any, rating: number, newWeight: any, currentUser: User) {
+function ConfirmChanges(
+  navigation: any,
+  rating: number,
+  newWeight: any,
+  currentUser: User,
+  questions: ProgressQuestion[],
+  questionAnswers: Record<string, string>
+) {
   if (currentUser.feelBetter && currentUser.loseWeight) {
     currentUser.goalType = 'both';
   } else if (currentUser.loseWeight) {
@@ -192,6 +257,26 @@ function ConfirmChanges(navigation: any, rating: number, newWeight: any, current
     currentUser.goalType = 'feelBetter';
   }
 
+  const builtQuestionAnswers = questions.map((questionItem) => ({
+    question_id: questionItem.question_id,
+    question: questionItem.question,
+    answer: (questionAnswers[questionItem.question_id] || '').trim(),
+    answered_at: new Date().toISOString(),
+  }));
+
+  for (const questionItem of questions) {
+    const answerText = (questionAnswers[questionItem.question_id] || '').trim();
+    if (!answerText) {
+      Alert.alert('Missing Information', 'Please answer every question before submitting.');
+      return;
+    }
+    if (answerText.length < questionItem.min_chars) {
+      Alert.alert('More Detail Needed', `Please enter at least ${questionItem.min_chars} characters for ${questionItem.question}.`);
+      return;
+    }
+  }
+
+  // Validation to ensure user doesn't submit without rating if they have the feel-better goal
   if (currentUser.feelBetter && (rating === 0 || rating === null)) {
     Alert.alert('Missing Information', "Uh oh! Make sure you rate how you're feeling before you submit.", [
       { text: 'Cancel', style: 'cancel' },
@@ -207,7 +292,8 @@ function ConfirmChanges(navigation: any, rating: number, newWeight: any, current
           if (currentUser.loseWeight && currentUser.goalWeight && newWeight <= currentUser.goalWeight) {
             goHome = false;
           }
-          await addUserProgress(currentUser, rating, newWeight, navigation, goHome);
+          // add progress logging entry, then check if we need to send feel-better message or weight goal achievement message and update goals if necessary
+          await addUserProgress(currentUser, rating, newWeight, navigation, goHome, builtQuestionAnswers);
           if (currentUser.feelBetter) {
             await sendFeelBetterMessage(rating);
           }
@@ -282,14 +368,33 @@ function NavigateToNotifications(currentUser: any, navigation: any) {
   ]);
 }
 
-async function addUserProgress(currentUser: any, rating: number, newWeight: number, navigation: any, goHome: boolean) {
+async function addUserProgress(
+  currentUser: any,
+  rating: number,
+  newWeight: number,
+  navigation: any,
+  goHome: boolean,
+  questionAnswers: Array<{ question_id: string; question: string; answer: string; answered_at: string }>
+) {
+  // add progress logging to User Datas table
   fetch(`${AppUrls.url}/userdata/${currentUser.userId}/`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ goal_type: currentUser.goalType, weight_value: newWeight, feel_better_value: rating }),
+    headers: { 'Content-Type': 'application/json', ...AppUrls.apiHeaders },
+    body: JSON.stringify({
+      goal_type: currentUser.goalType,
+      weight_value: newWeight,
+      feel_better_value: rating,
+      question_answers: questionAnswers,
+    }),
   })
     .then((r) => {
-      if (!r.ok) throw new Error('Failed');
+      if (!r.ok) {
+        return r.json().then((errorData) => {
+          const errorMessage = errorData?.message || 'Failed to save progress.';
+          const errorDetails = Array.isArray(errorData?.feedback) ? `\n${errorData.feedback.join('\n')}` : '';
+          throw new Error(`${errorMessage}${errorDetails}`);
+        });
+      }
       return r.json();
     })
     .then(() => {
@@ -299,8 +404,8 @@ async function addUserProgress(currentUser: any, rating: number, newWeight: numb
         navigation.navigate('HomePage', { currentUser } as never);
       }
     })
-    .catch(() => {
-      Alert.alert('Failed to save your progress. Please try again!');
+    .catch((error) => {
+      Alert.alert('Failed to save your progress. Please try again!', error?.message || 'Unknown error');
     });
 }
 
@@ -415,6 +520,34 @@ const styles = StyleSheet.create({
   },
 
   stars: { marginTop: 10, alignSelf: 'center' },
+
+  questionBlock: {
+    marginTop: 12,
+  },
+
+  questionText: {
+    color: '#344054',
+    fontSize: 15,
+    marginBottom: 8,
+  },
+
+  answerInput: {
+    borderWidth: 1,
+    borderColor: '#D0D5DD',
+    borderRadius: 10,
+    minHeight: 84,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: '#101828',
+    textAlignVertical: 'top',
+    backgroundColor: '#FFFFFF',
+  },
+
+  minCharHint: {
+    marginTop: 4,
+    color: '#667085',
+    fontSize: 12,
+  },
 
   cta: {
     backgroundColor: UF_ORANGE,

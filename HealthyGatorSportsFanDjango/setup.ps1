@@ -55,7 +55,8 @@ DATABASE_PASSWORD=your_password_here
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 "@
-    $envContent | Out-File -FilePath $envPath -Encoding UTF8
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($envPath, $envContent, $utf8NoBom)
     Write-Host "[OK] .env file created"
     Write-Host "[WARN] Update DATABASE_USER and DATABASE_PASSWORD in .env"
 } else {
