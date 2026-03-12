@@ -5,6 +5,7 @@ Upgrade to SDK 53, then to 54
 https://docs.expo.dev/workflow/upgrading-expo-sdk-walkthrough/
 
 Execute all commands in HealthyGatorSportsFanRN unless otherwise specified
+Not all commands will need to be executed, some additional commands may need to be executed; different people could run into different issues
 
 - npm install expo@^53.0.0
 - npx expo install --fix
@@ -42,12 +43,14 @@ Run frontend and backend
 If frontend terminal says "Using Development build" press S to switch to expo go
 Install expo go app on phone, and login
 Scan QR code with phone camera, select open in expo go
-Go to backend Django terminal
+Login to HealthyGatorSportsFan in Expo Go
+Go to frontend terminal (where you did .\run.ps1 in HealthyGatorSportsFanRN)
 Look for 'push_token': 'ExponentPushToken[]' and copy what is between the []
 Open new terminal in Django folder
 - venv\Scripts\activate
 - python manage.py shell
-Paste the following:
+Replace YOUR_COPIED_TOKEN below with the value you copied earlier, then copy and paste everything below this line, then press ENTER:
+
 from app.utils import send_notification, cache
 
 # 1. Clear the cache so it doesn't think the score hasn't changed
@@ -55,7 +58,7 @@ cache.delete('last_score')
 
 # 2. Mock the token retrieval temporarily
 def mock_get_tokens():
-    return [{'push_token': 'ExponentPushToken[YOUR_COPIED_TOKEN]', 'user_id': 1}]
+    return [{'push_token': 'ExponentPushToken[PJ8BHMHao1_nuv48oW26pG]', 'user_id': 1}]
 
 # 3. Temporarily override the function for this test session
 import app.utils
@@ -70,6 +73,6 @@ send_notification(
     away_score=70
 )
 
-# Don't copy anything past this line
-
-Replacing YOUR_COPIED_TOKEN with the value you copied earlier
+# STOP COPYING HERE
+You should see a notification in the app. For push notifications, just minimize or close the app, then paste and enter the code again, and a push
+notification should appear
