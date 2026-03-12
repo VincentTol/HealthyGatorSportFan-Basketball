@@ -240,6 +240,14 @@ export default function HomePage() {
               </Text>
             )}
 
+            <TouchableOpacity
+              style={[styles.cta, { marginTop: 18 }]}
+              activeOpacity={0.8}
+              onPress={() => NavigateToProgressDashboard(currentUser, navigation)}
+            >
+              <Text style={styles.ctaText}>View Progress Dashboard</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity style={styles.cta} onPress={demoGameNotifications}>
               <Text onPress={() => {Linking.openURL('https://ufl.qualtrics.com/jfe/form/SV_3V4CndUea1oyhXE')}} style={styles.ctaText}>Take Post-Game Survey</Text>
             </TouchableOpacity>
@@ -318,6 +326,9 @@ function NavigateToProfileManagement(currentUser: any, navigation: any) {
 }
 function NavigateToProcessLogging(currentUser: any, navigation: any) {
   navigation.navigate('ProcessLogging', { currentUser } as never);
+}
+function NavigateToProgressDashboard(currentUser: any, navigation: any) {
+  navigation.navigate('ProgressDashboard', { currentUser } as never);
 }
 function LogoutPopup(navigation: any) {
   Alert.alert('Confirmation', 'Are you sure you want logout?', [
