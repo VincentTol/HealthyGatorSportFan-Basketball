@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from app.views import index, CreateUserView, poll_cfbd_view, home_tile_view, schedule_view, CreateUserDataView, NotificationListView, CreateNotificationView, DeleteNotificationView, BulkDeleteNotificationsView, UserLoginView, LatestUserDataView, UserUpdateView, CheckEmailView, me_view, AnalyzeProgressTextView, QuestionBankView
+from app.views import index, CreateUserView, poll_cfbd_view, home_tile_view, schedule_view, news_view, CreateUserDataView, NotificationListView, CreateNotificationView, DeleteNotificationView, BulkDeleteNotificationsView, UserLoginView, LatestUserDataView, UserUpdateView, CheckEmailView, me_view, AnalyzeProgressTextView, QuestionBankView
 
 # Import drf-yasg components
 from drf_yasg.views import get_schema_view 
@@ -63,6 +63,7 @@ urlpatterns = [
     path('poll_cfbd/', poll_cfbd_view, name='poll_cfbd_alias'),
     path('home-tile/', home_tile_view, name='home_tile_view'),
     path('schedule-tile/', schedule_view, name='schedule_tile'),
+    path('gators-news/', news_view, name='gators_news'),
     
     # API endpoint for Swagger
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
