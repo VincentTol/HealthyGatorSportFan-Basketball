@@ -35,7 +35,7 @@ from app.views import (
     me_view,
     news_view,
     AnalyzeProgressTextView,
-    QuestionBankView
+    QuestionBankView,
 )
 
 # Import drf-yasg components
