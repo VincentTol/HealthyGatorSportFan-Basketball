@@ -10,7 +10,7 @@ import os
 import pytz
 from django.http import JsonResponse
 from datetime import date, datetime, timezone, timedelta
-from .utils import send_push_notification_next_game, check_game_status_basketball, send_notification, get_users_with_push_token, get_cached_uf_games
+from .utils import send_push_notification_next_game, check_game_status_basketball, send_notification, get_users_with_push_token, get_cached_uf_games, get_gators_basketball_news
 from django.views.decorators.csrf import csrf_exempt
 from django.core.cache import cache
 from .management.commands import poll_cfbd
@@ -21,6 +21,7 @@ from drf_yasg import openapi
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 import requests
+from .llm import LLMClient, LLMClientError, QuestionBank
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -116,34 +117,123 @@ class CreateUserDataView(APIView):
     @swagger_auto_schema(operation_summary="Log user progress", operation_description="Create a new userData entry to add to the database. This is used to log a snapshot in time of progress toward the user's goal(s).", request_body=UserDataSerializer)
     def post(self, request, user_id):
         # Retrieve the user by ID
-        user = User.objects.get(pk=user_id) # pk is primary key
+        try:
+            user = User.objects.get(pk=user_id) # pk is primary key
+        except User.DoesNotExist:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        question_answers = request.data.get('question_answers', [])
+        is_valid_answers, feedback_message, feedback_items = LLMClient.validate_descriptive_responses(question_answers)
+        if not is_valid_answers:
+            return Response(
+                {
+                    "error": "Validation failed",
+                    "message": feedback_message,
+                    "feedback": feedback_items,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        client = LLMClient()
+        try:
+            analysis = client.analyze_progress_text(question_answers)
+        except LLMClientError as exc:
+            return Response(
+                {"error": "LLM analysis failed", "message": str(exc)},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        request_data = request.data.copy()
+        request_data['question_answers'] = question_answers
+        request_data['excitement'] = analysis.get('excitement')
+        request_data['frustration'] = analysis.get('frustration')
+        request_data['anger'] = analysis.get('anger')
+
         user_data = UserData.objects.create(user=user)
         # Update user data with new information
-        user_serializer = UserSerializer(user, data=request.data, partial=True)
+        user_serializer = UserSerializer(user, data=request_data, partial=True)
         if user_serializer.is_valid():
             user_serializer.save()
-            user_data_serializer = UserDataSerializer(user_data, data=request.data, partial=True)
+            user_data_serializer = UserDataSerializer(user_data, data=request_data, partial=True)
             if user_data_serializer.is_valid():
                 userData = user_data_serializer.save()
                 response_data = {'data_id': userData.data_id}
                 response_data.update(user_data_serializer.data)
                 return Response(response_data, status=status.HTTP_201_CREATED)
             return Response(user_data_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        return Response(user_data_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class QuestionBankView(APIView):
+    def get(self, request):
+        return Response({"questions": QuestionBank.get_questions()}, status=status.HTTP_200_OK)
+
+
+class AnalyzeProgressTextView(APIView):
+    @swagger_auto_schema(
+        operation_summary="Analyze progress responses",
+        operation_description="Analyze question/answer responses and emotion values using LLM client.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'question_answers': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_OBJECT)),
+            },
+        ),
+    )
+    def post(self, request, user_id):
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        question_answers = request.data.get('question_answers')
+        if question_answers is None:
+            latest_data = UserData.objects.filter(user_id=user.user_id).order_by('-timestamp').first()
+            if not latest_data:
+                return Response({"error": "No user data found to analyze."}, status=status.HTTP_404_NOT_FOUND)
+            question_answers = latest_data.question_answers
+
+        is_valid_answers, feedback_message, feedback_items = LLMClient.validate_descriptive_responses(question_answers)
+        if not is_valid_answers:
+            return Response(
+                {
+                    "error": "Validation failed",
+                    "message": feedback_message,
+                    "feedback": feedback_items,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        client = LLMClient()
+        try:
+            analysis = client.analyze_progress_text(question_answers)
+            return Response(
+                {
+                    "user_id": user.user_id,
+                    "analysis": analysis,
+                },
+                status=status.HTTP_200_OK,
+            )
+        except LLMClientError as exc:
+            return Response(
+                {"error": "LLM analysis failed", "message": str(exc)},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
 
 class LatestUserDataView(APIView):
     @swagger_auto_schema(
-        operation_summary="Get latest user progress", operation_description="Get the latest entry of user's progress from the userData table.",
+        operation_summary="Get latest user progress",
+        operation_description="Get the latest entry of user's progress from the userData table.",
         manual_parameters=[
             openapi.Parameter(
-                'user_id',  # Name of the parameter
-                openapi.IN_PATH,  # Location of the parameter
+                'user_id',
+                openapi.IN_PATH,
                 description="User ID for which we are getting the latest user data entry for",
-                type=openapi.TYPE_STRING,  # Type of the parameter
-                required=True  # Whether the parameter is required
+                type=openapi.TYPE_STRING,
+                required=True,
             )
         ],
-        responses={200: UserDataSerializer(many=True)}  # Define response schema
+        responses={200: UserDataSerializer(many=True)},
     )
     def get(self, request, user_id):
         try:
@@ -151,10 +241,34 @@ class LatestUserDataView(APIView):
             if recent_data:
                 serializer = UserDataSerializer(recent_data)
                 return Response(serializer.data, status=status.HTTP_200_OK)
-            else:
-                return Response({"message": "No data found for this user."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": "No data found for this user."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AllUserDataView(generics.ListAPIView):
+    serializer_class = UserDataSerializer
+
+    @swagger_auto_schema(
+        operation_summary="Get all user progress",
+        operation_description="Get all userData entries for a user, ordered by newest first.",
+        manual_parameters=[
+            openapi.Parameter(
+                'user_id',
+                openapi.IN_PATH,
+                description="User ID for which we are getting all user data entries",
+                type=openapi.TYPE_STRING,
+                required=True,
+            )
+        ],
+        responses={200: UserDataSerializer(many=True)},
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        user_id = self.kwargs['user_id']
+        return UserData.objects.filter(user_id=user_id).order_by('-timestamp')
 
 # # API view to handle POST requests for data sent from the front-end (basicinfo.tsx)
 # class BasicInfoView(APIView):
@@ -520,7 +634,16 @@ def schedule_view(request):
             future_games.append(game)
 
     return JsonResponse({"data": future_games})
-    
+
+
+def news_view(request):
+    """GET: Return Florida Gators basketball news (Google News RSS, cached). No auth required."""
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+    articles = get_gators_basketball_news()
+    return JsonResponse({"data": articles})
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def me_view(request):

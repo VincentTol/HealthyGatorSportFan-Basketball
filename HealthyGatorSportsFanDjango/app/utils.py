@@ -1,7 +1,9 @@
 from exponent_server_sdk import PushClient, PushMessage
 import os
 import logging
+import re
 import requests
+import xml.etree.ElementTree as ET
 from datetime import date, datetime, timezone
 from .models import User, NotificationData
 from .serializers import UserSerializer
@@ -229,3 +231,82 @@ def send_notification(game_status: str, home_team: str, home_score: int, away_te
             if last_score != current_score:
                 send_push_notification_next_game("Health Notification", pushTokens, message)
                 cache.set('last_score', current_score)
+
+
+# News: Google News RSS (free, no API key, no limit).
+GATORS_NEWS_CACHE_KEY = "gators_basketball_news"
+GATORS_NEWS_CACHE_TTL = 60 * 60  # 1 hour
+GOOGLE_NEWS_RSS_URL = "https://news.google.com/rss/search?q=Florida+Gators+basketball&hl=en-US&gl=US&ceid=US:en"
+
+
+def _tag_local(tag):
+    """Return local part of tag (no namespace)."""
+    if not tag:
+        return ""
+    return tag.split("}")[-1] if "}" in tag else tag
+
+
+def _find_child(parent, local_name):
+    """Find direct child by local tag name."""
+    for c in parent:
+        if _tag_local(c.tag) == local_name:
+            return c
+    return None
+
+
+def _find_text(parent, local_name):
+    """Get text of first child with given local name."""
+    el = _find_child(parent, local_name)
+    return (el.text or "").strip() if el is not None else ""
+
+
+def _parse_google_news_rss():
+    """Fetch and parse Google News RSS for Florida Gators basketball. No API key. Returns list of article dicts."""
+    result = []
+    try:
+        resp = requests.get(GOOGLE_NEWS_RSS_URL, timeout=10, headers={"User-Agent": "HealthyGatorSportsFan/1.0"})
+        resp.raise_for_status()
+        root = ET.fromstring(resp.content)
+        for elem in root.iter():
+            if _tag_local(elem.tag) != "item":
+                continue
+            title = _find_text(elem, "title")
+            if not title:
+                continue
+            link = _find_text(elem, "link")
+            src_el = _find_child(elem, "source")
+            if src_el is not None and src_el.get("url"):
+                link = link or (src_el.get("url") or "")
+            source_name = (src_el.text or "").strip() if src_el is not None else "Google News"
+            pub_date = _find_text(elem, "pubDate")
+            description = _find_text(elem, "description")
+            if description:
+                description = re.sub(r"<[^>]+>", "", description)[:300].strip() or None
+            result.append({
+                "title": title,
+                "url": link or "",
+                "source": source_name or "News",
+                "publishedAt": pub_date,
+                "description": description,
+                "urlToImage": None,
+            })
+            if len(result) >= 20:
+                break
+    except Exception as e:
+        logger.warning("Google News RSS fetch failed: %s", e)
+    return result
+
+
+def get_gators_basketball_news():
+    """
+    Fetch Florida Gators basketball news from Google News RSS (cached 1 hour).
+    No API key required. Returns list of dicts: title, url, source, publishedAt, description, urlToImage.
+    """
+    cached = cache.get(GATORS_NEWS_CACHE_KEY)
+    if cached is not None:
+        logger.info("Cache hit: Returning cached Gators news.")
+        return cached
+    result = _parse_google_news_rss()
+    if result:
+        cache.set(GATORS_NEWS_CACHE_KEY, result, timeout=GATORS_NEWS_CACHE_TTL)
+    return result
