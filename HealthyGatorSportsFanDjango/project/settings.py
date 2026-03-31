@@ -53,6 +53,7 @@ ALLOWED_HOSTS = [
     'tuna-fleet-hamster.ngrok-free.app',
     'nannie-halogenous-tidily.ngrok-free.dev',
     'nonparabolical-unwaddling-blaise.ngrok-free.dev',
+    'interprofessionally-nonappeasable-garfield.ngrok-free.dev'
     # Add your current ngrok host here when you run: ngrok http 8000
 ]
 
@@ -220,19 +221,21 @@ CSRF_TRUSTED_ORIGINS = [
     'https://strongly-inviting-stinkbug.ngrok-free.app',
     'https://healthygatorsportsfan-84ee3c84673f.herokuapp.com',
     'https://tuna-fleet-hamster.ngrok-free.app',
-    'https://nannie-halogenous-tidily.ngrok-free.dev'
+    'https://nannie-halogenous-tidily.ngrok-free.dev',
+    'https://interprofessionally-nonappeasable-garfield.ngrok-free.dev'
 ]
 
-# Celery configuration
+# Celery and cache Redis configuration
+REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+
 if os.getenv('K_SERVICE'):
     # Production Redis configuration for Cloud Run
-    REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
     CELERY_BROKER_URL = REDIS_URL
     CELERY_RESULT_BACKEND = REDIS_URL
 else:
-    # Local Redis configuration
-    CELERY_BROKER_URL = 'redis://localhost:6379/0'
-    CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+    # Local Redis configuration (override with REDIS_URL in .env)
+    CELERY_BROKER_URL = REDIS_URL
+    CELERY_RESULT_BACKEND = REDIS_URL
 
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
@@ -254,7 +257,6 @@ except ImportError:
     _redis_available = False
 
 if _redis_available:
-    REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
     CACHES = {
         'default': {
             'BACKEND': 'django_redis.cache.RedisCache',

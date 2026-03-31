@@ -1,0 +1,72 @@
+Have to do these steps to emulate in expo go app on iPhone
+
+Upgrade to SDK 53, then to 54
+
+https://docs.expo.dev/workflow/upgrading-expo-sdk-walkthrough/
+
+Execute all commands in HealthyGatorSportsFanRN unless otherwise specified
+
+- npm install expo@^53.0.0
+- npx expo install --fix
+	This failed, so I did
+	- npx expo install --fix -- --legacy-peer-deps
+- npx expo-doctor
+	Some of these checks failed regarding react native, so I did
+	- npm uninstall @types/react-native
+	- npx expo prebuild --clean
+- npm install expo@^54.0.0
+	Had errors here, did this
+	- Stop-Process -Name "java" -ErrorAction SilentlyContinue
+	- Stop-Process -Name "node" -ErrorAction SilentlyContinue
+	- Remove-Item -Recurse -Force "node_modules/expo-modules-autolinking/android/expo-gradle-plugin/.gradle"
+- npx expo install expo@^54.0.0 -- --legacy-peer-deps
+- npx expo install --fix -- --legacy-peer-deps
+- npx expo-doctor
+	Failed checks, did this
+	- npx expo install react-native-worklets
+	- npx expo prebuild --clean
+Close everything, in file explorer go to HealthyGatorSportsFanRN and delete .expo and android folders
+Add \android to .gitignore in RN folder
+- git rm -r --cached android
+- git commit -m "Move to CNG: ignore native folders in git"
+- npx expo prebuild
+- npx expo install --fix
+	Should now say "Dependencies are up to date"
+-npx expo-doctor
+	Should now pass all checks
+
+Run frontend and backend
+If frontend terminal says "Using Development build" press S to switch to expo go
+Install expo go app on phone, and login
+Scan QR code with phone camera, select open in expo go
+Go to backend Django terminal
+Look for 'push_token': 'ExponentPushToken[]' and copy what is between the []
+Replacing YOUR_COPIED_TOKEN below with the value you copied earlier
+Open new terminal in Django folder
+- venv\Scripts\activate
+- python manage.py shell
+Paste the following:
+from app.utils import send_notification, cache
+
+# 1. Clear the cache so it doesn't think the score hasn't changed
+cache.delete('last_score')
+
+# 2. Mock the token retrieval temporarily
+def mock_get_tokens():
+    return [{'push_token': 'ExponentPushToken[YOUR_COPIED_TOKEN]', 'user_id': 1}]
+
+# 3. Temporarily override the function for this test session
+import app.utils
+app.utils.get_users_with_push_token = mock_get_tokens
+
+# 4. Trigger the notification
+send_notification(
+    game_status='winning_decisive',
+    home_team='Florida',
+    home_score=85,
+    away_team='Georgia',
+    away_score=70
+)
+
+# Don't copy anything past this line
+

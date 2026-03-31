@@ -7,6 +7,20 @@ Set-Location -Path $PSScriptRoot
 $venvPath = Join-Path $PSScriptRoot "venv\Scripts\Activate.ps1"
 $venvPython = Join-Path $PSScriptRoot "venv\Scripts\python.exe"
 $celeryExe = Join-Path $PSScriptRoot "venv\Scripts\celery.exe"
+$envFilePath = Join-Path $PSScriptRoot ".env"
+
+$redisUrl = "redis://localhost:6379/0"
+if (Test-Path $envFilePath) {
+    $redisLine = Get-Content -Path $envFilePath | Where-Object { $_ -match '^REDIS_URL=' } | Select-Object -First 1
+    if ($redisLine) {
+        $redisUrl = $redisLine.Substring("REDIS_URL=".Length).Trim()
+    }
+}
+
+$redisPort = 6379
+if ($redisUrl -match ':(\d+)/\d+$') {
+    $redisPort = [int]$Matches[1]
+}
 
 if (-not (Test-Path $venvPython)) {
     throw "Virtual environment not found. Run .\setup.ps1 first."
@@ -15,6 +29,24 @@ if (-not (Test-Path $venvPython)) {
 Write-Host "=========================================="
 Write-Host "HealthyGatorSportsFan Django Services"
 Write-Host "=========================================="
+
+function Wait-ForRedis {
+    param(
+        [int]$Port,
+        [int]$TimeoutSeconds = 30
+    )
+
+    $start = Get-Date
+    while (((Get-Date) - $start).TotalSeconds -lt $TimeoutSeconds) {
+        $redisListening = Test-NetConnection -ComputerName localhost -Port $Port -InformationLevel Quiet
+        if ($redisListening) {
+            return $true
+        }
+        Start-Sleep -Seconds 1
+    }
+
+    return $false
+}
 
 $redisService = Get-Service -Name Redis -ErrorAction SilentlyContinue
 if ($null -ne $redisService) {
@@ -27,7 +59,7 @@ if ($null -ne $redisService) {
 
         Start-Service -Name Redis -ErrorAction Stop
         Start-Sleep -Seconds 1
-        Write-Host "Redis service restarted and running on localhost:6379."
+        Write-Host "Redis service restarted. Expecting Redis at localhost:$redisPort."
     } catch {
         Write-Warning "Current shell lacks permission to restart Redis service. Requesting elevation..."
         try {
@@ -54,7 +86,7 @@ try {
                 Start-Sleep -Seconds 1
                 $redisServiceAfter = Get-Service -Name Redis -ErrorAction SilentlyContinue
                 if ($null -ne $redisServiceAfter -and $redisServiceAfter.Status -eq 'Running') {
-                    Write-Host "Redis service restarted and running on localhost:6379."
+                    Write-Host "Redis service restarted. Expecting Redis at localhost:$redisPort."
                 } else {
                     Write-Warning "Elevated command exited successfully, but Redis service is not running."
                 }
@@ -69,9 +101,9 @@ try {
         }
     }
 } else {
-    $redisUp = Test-NetConnection -ComputerName localhost -Port 6379 -InformationLevel Quiet
+    $redisUp = Test-NetConnection -ComputerName localhost -Port $redisPort -InformationLevel Quiet
     if (-not $redisUp) {
-        Write-Warning "Redis does not appear to be running on localhost:6379"
+        Write-Warning "Redis does not appear to be running on localhost:$redisPort"
 
         $redisInstallDir = "C:\Program Files\Redis"
         $redisServerExe = Join-Path $redisInstallDir "redis-server.exe"
@@ -85,7 +117,7 @@ try {
                     "-Command", "Set-Location '$redisInstallDir'; .\redis-server.exe"
                 ) | Out-Null
 
-                Write-Host "If Redis shows '# Creating Server TCP listening socket *:6379: No such file or directory', run this in the Redis window:"
+                Write-Host "If Redis starts but app still cannot connect, verify REDIS_URL in .env and Redis service port."
                 Write-Host "  .\redis-cli.exe"
                 Write-Host "  shutdown"
                 Write-Host "  (Ctrl+C to exit, then rerun .\redis-server.exe)"
@@ -101,11 +133,19 @@ try {
             Write-Host "Install Redis or update this script with your Redis install path."
         }
     } else {
-        Write-Host "Redis is already running on localhost:6379; skipping Redis startup."
+        Write-Host "Redis is already running on localhost:$redisPort; skipping Redis startup."
     }
 }
 
-if (Test-Path $celeryExe) {
+$redisReady = Wait-ForRedis -Port $redisPort -TimeoutSeconds 30
+if (-not $redisReady) {
+    Write-Warning "Redis is not reachable on localhost:$redisPort after waiting 30 seconds."
+    Write-Warning "Skipping Celery startup. Start Redis, then run:"
+    Write-Host "  .\venv\Scripts\Activate.ps1"
+    Write-Host "  celery -A project worker --pool=solo -l info"
+    Write-Host "  celery -A project beat --loglevel=info"
+}
+elseif (Test-Path $celeryExe) {
     Write-Host "Starting Celery worker in a new PowerShell window..."
     Start-Process powershell -ArgumentList @(
         "-NoExit",
@@ -128,7 +168,7 @@ if (Get-Command ngrok -ErrorAction SilentlyContinue) {
     Start-Process powershell -ArgumentList @(
         "-NoExit",
         "-ExecutionPolicy", "Bypass",
-        "-Command", "Set-Location '$PSScriptRoot'; ngrok http 8000 --url https://nannie-halogenous-tidily.ngrok-free.dev"
+        "-Command", "Set-Location '$PSScriptRoot'; ngrok http 8000 --url https://interprofessionally-nonappeasable-garfield.ngrok-free.dev"
     )
 } else {
     Write-Warning "ngrok is not on PATH; skipping ngrok startup."
