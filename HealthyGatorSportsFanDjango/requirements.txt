@@ -10,6 +10,7 @@ exponent_server_sdk==2.1.0
 git-filter-repo==2.45.0
 gunicorn==23.0.0
 idna==3.10
+openai==2.26.0
 packaging==24.2
 psycopg==3.2.3
 psycopg-binary==3.2.3

@@ -169,7 +169,9 @@ const getLatestUserData = async (currentUser: any, navigation: any, accessToken?
 
     if (response.ok) {
       const data = await response.json();
-      currentUser.currentWeight = data.weight_value;
+      const raw = data.weight_value;
+      const w = raw == null || raw === '' ? NaN : typeof raw === 'number' ? raw : parseFloat(String(raw));
+      currentUser.currentWeight = Number.isFinite(w) ? w : 0;
       currentUser.goalType = data.goal_type;
       currentUser.lastRating = data.feel_better_value;
       navigation.navigate('HomePage', { currentUser } as never);
