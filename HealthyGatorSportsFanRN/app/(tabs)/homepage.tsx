@@ -153,13 +153,6 @@ export default function HomePage() {
 
       <ScrollView contentContainerStyle={{ paddingBottom: padBottom }} showsVerticalScrollIndicator={false}>
         <View style={styles.centerStack}>
-          {showMarchMadnessKnockout && (
-            <View style={styles.mmNotice} accessibilityRole="text">
-              <Text style={styles.mmNoticeLabel}>🏀 March Madness</Text>
-              <Text style={styles.mmNoticeText}>{MARCH_MADNESS_KNOCKOUT_MESSAGE}</Text>
-            </View>
-          )}
-
           <View
             style={[
               styles.card,
@@ -168,48 +161,55 @@ export default function HomePage() {
             ]}
           >
             <Text style={styles.sectionTitle}>Next Game</Text>
-            {showMarchMadnessKnockout && (
-              <Text style={styles.mmCardHint}>No upcoming tournament games on the schedule</Text>
-            )}
             <View style={styles.underline} />
 
-            {!!gameData.date && (
-              <View style={styles.chipsRow}>
-                <View style={styles.chip}>
-                  <Text style={styles.chipText}>{countdownText ?? '—'}</Text>
+            {showMarchMadnessKnockout ? (
+              <View style={styles.mmInCard} accessibilityRole="text">
+                <Text style={styles.mmNoticeLabel}>🏀 March Madness</Text>
+                <Text style={styles.mmNoticeText}>{MARCH_MADNESS_KNOCKOUT_MESSAGE}</Text>
+                <Text style={styles.mmSubtext}>No upcoming tournament games on the schedule</Text>
+              </View>
+            ) : (
+              <>
+                {!!gameData.date && (
+                  <View style={styles.chipsRow}>
+                    <View style={styles.chip}>
+                      <Text style={styles.chipText}>{countdownText ?? '—'}</Text>
+                    </View>
+                  </View>
+                )}
+
+                <View style={styles.teamsRow}>
+                  <View style={styles.teamSide}>
+                    {loading ? (
+                      <Text>Loading…</Text>
+                    ) : HomeLogo ? (
+                      <Image source={HomeLogo} style={styles.teamLogo} resizeMode="contain" />
+                    ) : (
+                      <Text>No Logo</Text>
+                    )}
+                  </View>
+
+                  <View style={styles.vsBlock}>
+                    <Text style={styles.matchupText}>
+                      {gameData.home_team || '—'} <Text style={{ color: '#FA4616', fontWeight: '800' }}>vs</Text>{' '}
+                      {gameData.away_team || '—'}
+                    </Text>
+                    <Text style={styles.dateText}>{gameData.date || ''}</Text>
+                  </View>
+
+                  <View style={styles.teamSide}>
+                    {loading ? (
+                      <Text>Loading…</Text>
+                    ) : AwayLogo ? (
+                      <Image source={AwayLogo} style={styles.teamLogo} resizeMode="contain" />
+                    ) : (
+                      <Text>No Logo</Text>
+                    )}
+                  </View>
                 </View>
-              </View>
+              </>
             )}
-
-            <View style={styles.teamsRow}>
-              <View style={styles.teamSide}>
-                {loading ? (
-                  <Text>Loading…</Text>
-                ) : HomeLogo ? (
-                  <Image source={HomeLogo} style={styles.teamLogo} resizeMode="contain" />
-                ) : (
-                  <Text>No Logo</Text>
-                )}
-              </View>
-
-              <View style={styles.vsBlock}>
-                <Text style={styles.matchupText}>
-                  {gameData.home_team || '—'} <Text style={{ color: '#FA4616', fontWeight: '800' }}>vs</Text>{' '}
-                  {gameData.away_team || '—'}
-                </Text>
-                <Text style={styles.dateText}>{gameData.date || ''}</Text>
-              </View>
-
-              <View style={styles.teamSide}>
-                {loading ? (
-                  <Text>Loading…</Text>
-                ) : AwayLogo ? (
-                  <Image source={AwayLogo} style={styles.teamLogo} resizeMode="contain" />
-                ) : (
-                  <Text>No Logo</Text>
-                )}
-              </View>
-            </View>
           </View>
 
           <View style={styles.quickRow}>
@@ -488,39 +488,37 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
 
-  mmNotice: {
+  mmInCard: {
+    marginTop: 4,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
     backgroundColor: '#FFF4ED',
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#FDBA74',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginBottom: 10,
-    borderLeftWidth: 5,
-    borderLeftColor: '#FA4616',
   },
   mmNoticeLabel: {
     color: '#9A3412',
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.4,
-    marginBottom: 6,
+    marginBottom: 8,
     textAlign: 'center',
   },
   mmNoticeText: {
     color: '#7C2D12',
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     textAlign: 'center',
-    lineHeight: 21,
+    lineHeight: 22,
   },
-  mmCardHint: {
+  mmSubtext: {
     color: '#C2410C',
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
-    marginTop: 2,
-    marginBottom: 2,
+    marginTop: 10,
+    lineHeight: 18,
   },
 
   card: {
