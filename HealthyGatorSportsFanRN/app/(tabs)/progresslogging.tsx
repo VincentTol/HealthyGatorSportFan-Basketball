@@ -22,11 +22,22 @@ import GlobalStyles from '../styles/GlobalStyles';
 import { clearTokens } from "@/components/tokenStorage";
 
 const TAB_VISUAL_H = 64;
+const DEFAULT_MAX_CHARS = 250;
+
+function countWords(text: string): number {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return 0;
+  }
+  return trimmed.split(/\s+/).length;
+}
 
 export default function ProgressLogging() {
   const navigation = useNavigation();
   const route = useRoute();
-  const { currentUser } = route.params as { currentUser: any };
+  const routeParams = route.params as { currentUser?: User } | undefined;
+  const currentUser = routeParams?.currentUser ?? new User(0, '', '', '', '', '', '', 0, 0, 0, false, false, 0, '', 0, '');
+  const missingCurrentUser = !routeParams?.currentUser;
 
   const insets = useSafeAreaInsets();
   const [bottomH, setBottomH] = useState<number>(TAB_VISUAL_H + insets.bottom);
@@ -70,6 +81,26 @@ export default function ProgressLogging() {
     return newWeight !== currentUser.currentWeight;
   }
   usePreventRemove(dataEntered(), () => {});
+
+  if (missingCurrentUser) {
+    return (
+      <SafeAreaView style={[GlobalStyles.container, { backgroundColor: '#F7F9FF', justifyContent: 'center', padding: 24 }]} edges={['top']}>
+        <Text style={{ fontSize: 20, fontWeight: '700', color: '#0021A5', textAlign: 'center', marginBottom: 10 }}>
+          Session Expired
+        </Text>
+        <Text style={{ fontSize: 15, color: '#344054', textAlign: 'center', marginBottom: 20 }}>
+          We could not load your user data for this screen. Please sign in again.
+        </Text>
+        <TouchableOpacity
+          style={[GlobalStyles.confirmButton, { alignSelf: 'center', minWidth: 200 }]}
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('CreateOrSignIn' as never)}
+        >
+          <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700', textAlign: 'center' }}>Go To Sign In</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[GlobalStyles.container, { backgroundColor: '#F7F9FF' }]} edges={['top']}>
@@ -151,11 +182,19 @@ export default function ProgressLogging() {
 
           {questions.map((questionItem) => (
             <View key={questionItem.question_id} style={styles.questionBlock}>
+              {(() => {
+                const answerText = questionAnswers[questionItem.question_id] || '';
+                const maxChars = questionItem.max_chars || DEFAULT_MAX_CHARS;
+                const currentChars = answerText.length;
+                const currentWords = countWords(answerText);
+                return (
+                  <>
               <Text style={styles.questionText}>{questionItem.question}</Text>
               <TextInput
                 style={styles.answerInput}
                 multiline
-                value={questionAnswers[questionItem.question_id] || ''}
+                maxLength={maxChars}
+                value={answerText}
                 onChangeText={(text) =>
                   setQuestionAnswers((prev) => ({
                     ...prev,
@@ -165,7 +204,13 @@ export default function ProgressLogging() {
                 placeholder="Type your answer"
                 placeholderTextColor="#98A2B3"
               />
-              <Text style={styles.minCharHint}>Min chars: {questionItem.min_chars}</Text>
+              <Text style={styles.minCharHint}>
+                Characters: {currentChars}/{questionItem.min_chars} minimum, {maxChars} maximum
+              </Text>
+              <Text style={styles.wordHint}>Word count: {currentWords}</Text>
+                  </>
+                );
+              })()}
             </View>
           ))}
         </View>
@@ -266,12 +311,17 @@ function ConfirmChanges(
 
   for (const questionItem of questions) {
     const answerText = (questionAnswers[questionItem.question_id] || '').trim();
+    const maxChars = questionItem.max_chars || DEFAULT_MAX_CHARS;
     if (!answerText) {
       Alert.alert('Missing Information', 'Please answer every question before submitting.');
       return;
     }
     if (answerText.length < questionItem.min_chars) {
       Alert.alert('More Detail Needed', `Please enter at least ${questionItem.min_chars} characters for ${questionItem.question}.`);
+      return;
+    }
+    if (answerText.length > maxChars) {
+      Alert.alert('Too Long', `Please keep your answer to ${maxChars} characters or fewer for ${questionItem.question}.`);
       return;
     }
   }
@@ -544,6 +594,11 @@ const styles = StyleSheet.create({
   },
 
   minCharHint: {
+    marginTop: 4,
+    color: '#667085',
+    fontSize: 12,
+  },
+  wordHint: {
     marginTop: 4,
     color: '#667085',
     fontSize: 12,

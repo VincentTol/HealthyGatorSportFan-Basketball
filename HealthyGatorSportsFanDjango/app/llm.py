@@ -28,15 +28,21 @@ class QuestionBank:
                 question_id = str(item.get("question_id", "")).strip()
                 question = str(item.get("question", "")).strip()
                 min_chars = item.get("min_chars", 1)
+                max_chars = item.get("max_chars", 250)
                 if not question_id or not question:
                     continue
                 if not isinstance(min_chars, int):
                     min_chars = 1
+                if not isinstance(max_chars, int):
+                    max_chars = 250
+                if max_chars < min_chars:
+                    max_chars = min_chars
                 cleaned.append(
                     {
                         "question_id": question_id,
                         "question": question,
                         "min_chars": min_chars,
+                        "max_chars": max_chars,
                     }
                 )
             return cleaned
@@ -82,13 +88,19 @@ class LLMClient:
                 continue
 
             min_chars = int(bank[question_id].get("min_chars", 1))
+            max_chars = int(bank[question_id].get("max_chars", 250))
             if len(answer) < min_chars:
                 missing_or_short.append(
                     f"{question_id}: Please provide at least {min_chars} characters."
                 )
+                continue
+            if len(answer) > max_chars:
+                missing_or_short.append(
+                    f"{question_id}: Please keep your answer to {max_chars} characters or fewer."
+                )
 
         if missing_or_short:
-            return False, "Some answers need more detail.", missing_or_short
+            return False, "Some answers need to be adjusted.", missing_or_short
         return True, "Looks good.", []
 
     def analyze_progress_text(self, question_answers):

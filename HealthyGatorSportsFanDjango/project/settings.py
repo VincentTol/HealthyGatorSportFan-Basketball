@@ -14,6 +14,7 @@ import os
 
 # For accessing environment variables from your .env file
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 # Load environment variables from the .env file
 load_dotenv()
 
@@ -36,6 +37,13 @@ PORT = os.getenv('PORT', '8000')
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    # Cloud Run/production must provide an explicit key.
+    if os.getenv('K_SERVICE'):
+        raise ImproperlyConfigured('The SECRET_KEY setting must not be empty in production.')
+
+    # Local development fallback to keep the app runnable without a configured .env.
+    SECRET_KEY = 'django-insecure-local-dev-only-change-me'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
