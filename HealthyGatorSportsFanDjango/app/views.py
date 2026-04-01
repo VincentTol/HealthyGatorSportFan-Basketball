@@ -620,24 +620,17 @@ def schedule_view(request):
             {"error": f"Could not retrieve UF games for {date.today().year}"},
             status=500
         )
-    
-    future_games = []
-    today = datetime.combine(date.today(), datetime.min.time(), tzinfo=pytz.UTC)
 
-    for game in games_list:
-        # Parse startDate string to datetime if necessary
-        start_date_str = game['startDate']
-        if isinstance(start_date_str, str):
-            # Handle ISO format with 'Z' suffix
-            start_date_str = start_date_str.replace('Z', '+00:00')
-            game_start_date = datetime.fromisoformat(start_date_str)
-        else:
-            game_start_date = start_date_str
-        game_start_date = game_start_date.astimezone(pytz.UTC)
-        if game_start_date > today:
-            future_games.append(game)
+    # Reverse list so that it is ordered from newest to oldest (most recent first) based on start date
+    def _game_start_dt(game):
+        start_date_raw = game.get('startDate') or game.get('start_date')
+        if isinstance(start_date_raw, str):
+            start_date_raw = start_date_raw.replace('Z', '+00:00')
+            return datetime.fromisoformat(start_date_raw)
+        return start_date_raw or datetime.min.replace(tzinfo=pytz.UTC)
 
-    return JsonResponse({"data": future_games})
+    sorted_games = sorted(games_list, key=_game_start_dt, reverse=True)
+    return JsonResponse({"data": sorted_games})
 
 
 def news_view(request):

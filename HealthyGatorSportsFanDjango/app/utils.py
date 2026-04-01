@@ -15,13 +15,30 @@ logger = logging.getLogger(__name__)
 NCAA_SCOREBOARD_URL = "https://ncaa-api.henrygd.me/scoreboard/basketball-men/d1"
 
 
+def get_basketball_season_range(reference_dt=None):
+    """
+    Return ISO UTC start/end strings for the current basketball season.
+    Season spans Nov 1 through Apr 30 across calendar years.
+    """
+    now_utc = reference_dt or datetime.now(timezone.utc)
+    if now_utc.month >= 11:
+        season_start_year = now_utc.year
+        season_end_year = now_utc.year + 1
+    else:
+        season_start_year = now_utc.year - 1
+        season_end_year = now_utc.year
+
+    start_of_season = f"{season_start_year}-11-01T00:00:00Z"
+    end_of_season = f"{season_end_year}-04-30T23:59:59Z"
+    season_key = f"{season_start_year}_{season_end_year}"
+    return start_of_season, end_of_season, season_key
+
+
 def get_cached_uf_games():
     """Fetch Florida basketball games from collegebasketballdata.com (cached 24h)."""
-    current_year = datetime.now().year
-    CACHE_KEY = f'uf_basketball_games_{current_year}'
+    start_of_season, end_of_season, season_key = get_basketball_season_range()
+    CACHE_KEY = f'uf_basketball_games_{season_key}'
     CACHE_TTL = 60 * 60 * 24  # 24 hours
-    current_date_iso = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc).isoformat().replace('+00:00', 'Z')
-    end_of_season = "2026-04-15T23:59:59Z"
     games_list = cache.get(CACHE_KEY)
     if games_list is not None:
         logger.info("Cache hit: Returning cached UF games.")
@@ -30,7 +47,7 @@ def get_cached_uf_games():
     try:
         url = "https://api.collegebasketballdata.com/games"
         params = {
-            'startDateRange': current_date_iso,
+            'startDateRange': start_of_season,
             'endDateRange': end_of_season,
             'team': 'Florida',
             'conference': 'SEC'
