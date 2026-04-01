@@ -329,11 +329,13 @@ function addNewUserInitialProgress(navigation: any, currentUser: any){
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                ...AppUrls.apiHeaders,
             },
             body: JSON.stringify({
                 goal_type: currentUser.goalType,
                 weight_value: currentUser.currentWeight,
-                feel_better_value: 3
+                feel_better_value: 3,
+                question_answers: [],
             })
         })
         .then(response => {

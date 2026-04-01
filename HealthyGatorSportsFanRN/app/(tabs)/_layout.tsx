@@ -13,6 +13,8 @@ import NotificationsPage from "@/app/(tabs)/notifications";
 import GameSchedule from "@/app/(tabs)/gameschedule";
 import ProfileManagement from "@/app/(tabs)/profilemanagement";
 import ProcessLogging from "@/app/(tabs)/progresslogging";
+import ProgressDashboard from "@/app/(tabs)/progressdashboard";
+import GatorsNews from "@/app/(tabs)/gatorsnews";
 
 const Stack = createNativeStackNavigator();
 
@@ -47,6 +49,11 @@ export default function TabLayout() {
                   options={{headerShown: false}}
               />
               <Stack.Screen
+                  name="ProgressDashboard"
+                  component={ProgressDashboard}
+                  options={{headerShown: false}}
+              />
+              <Stack.Screen
                   name="ProfileManagement"
                   component={ProfileManagement}
                   options={{headerShown: false}}
@@ -74,6 +81,11 @@ export default function TabLayout() {
               <Stack.Screen
                   name="NotificationsPage"
                   component={NotificationsPage}
+                  options={{headerShown: false}}
+              />
+              <Stack.Screen
+                  name="GatorsNews"
+                  component={GatorsNews}
                   options={{headerShown: false}}
               />
           </Stack.Navigator>

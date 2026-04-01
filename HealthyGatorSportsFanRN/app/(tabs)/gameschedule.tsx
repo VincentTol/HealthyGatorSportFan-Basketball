@@ -30,6 +30,15 @@ type Game = {
   awayPoints: number | null;
 };
 
+type DateFilterKey = "7d" | "30d" | "60d" | "all";
+
+const DATE_FILTERS: { key: DateFilterKey; label: string; days?: number }[] = [
+  { key: "7d", label: "7D", days: 7 },
+  { key: "30d", label: "30D", days: 30 },
+  { key: "60d", label: "60D", days: 60 },
+  { key: "all", label: "All" },
+];
+
 export default function GameSchedule() {
   const insets = useSafeAreaInsets();
   const [bottomH, setBottomH] = useState(0);
@@ -41,6 +50,7 @@ export default function GameSchedule() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<Game[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [dateFilter, setDateFilter] = useState<DateFilterKey>("all");
 
   useEffect(() => {
     const run = async () => {
@@ -56,6 +66,19 @@ export default function GameSchedule() {
     };
     run();
   }, []);
+
+  const filteredGames = data.filter((game) => {
+    if (dateFilter === "all") return true;
+    const config = DATE_FILTERS.find((f) => f.key === dateFilter);
+    if (!config?.days) return true;
+
+    const gameDate = new Date(game.startDate);
+    if (Number.isNaN(gameDate.getTime())) return false;
+
+    const now = new Date();
+    const earliest = new Date(now.getTime() - config.days * 24 * 60 * 60 * 1000);
+    return gameDate <= now && gameDate >= earliest;
+  });
 
   return (
 
@@ -88,6 +111,22 @@ export default function GameSchedule() {
           }}
           showsVerticalScrollIndicator={false}
         >
+          <View style={styles.filterWrap}>
+            {DATE_FILTERS.map((filter) => {
+              const active = filter.key === dateFilter;
+              return (
+                <TouchableOpacity
+                  key={filter.key}
+                  onPress={() => setDateFilter(filter.key)}
+                  style={[styles.filterChip, active && styles.filterChipActive]}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{filter.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           {loading && (
             <View style={styles.stateBox}>
               <ActivityIndicator size="small" />
@@ -99,13 +138,13 @@ export default function GameSchedule() {
               <Text style={styles.stateText}>{error}</Text>
             </View>
           )}
-          {!loading && !error && data.length === 0 && (
+          {!loading && !error && filteredGames.length === 0 && (
             <View style={styles.stateBox}>
               <Text style={styles.stateText}>No games found.</Text>
             </View>
           )}
 
-          {data.map((g, idx) => (
+          {filteredGames.map((g, idx) => (
             <View key={`${g.week}-${idx}`} style={styles.card}>
               <View style={styles.cardHeader}>
                 <Text style={styles.cardHeaderText}>Week {g.week}</Text>
@@ -279,6 +318,34 @@ const colors = {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F7F7FB" },
   tabIcon: { width: 30, height: 30, alignSelf: "center", objectFit: "contain" },
+  filterWrap: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  filterChip: {
+    backgroundColor: "#E6ECF8",
+    borderWidth: 1,
+    borderColor: "#C9D7F2",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    minWidth: 64,
+    alignItems: "center",
+  },
+  filterChipActive: {
+    backgroundColor: colors.ufBlue,
+    borderColor: colors.ufBlue,
+  },
+  filterChipText: {
+    color: "#0A2F75",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  filterChipTextActive: {
+    color: "#FFFFFF",
+  },
   stateBox: { paddingTop: 40, alignItems: "center" },
   stateText: { color: "#6B7280", marginTop: 8 },
   card: {
