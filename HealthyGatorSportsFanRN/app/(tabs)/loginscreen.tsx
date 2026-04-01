@@ -113,7 +113,7 @@ const handleLogin = async (currentUser: any, email: any, password: any, navigati
     try {
         const response = await fetch(`${AppUrls.url}/user/login/`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json',},
+            headers: {'Content-Type': 'application/json', ...AppUrls.apiHeaders },
             body: JSON.stringify({ email, password }),
         });
 

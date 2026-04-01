@@ -123,31 +123,35 @@ class CreateUserDataView(APIView):
             return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
         question_answers = request.data.get('question_answers', [])
-        is_valid_answers, feedback_message, feedback_items = LLMClient.validate_descriptive_responses(question_answers)
-        if not is_valid_answers:
-            return Response(
-                {
-                    "error": "Validation failed",
-                    "message": feedback_message,
-                    "feedback": feedback_items,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        client = LLMClient()
-        try:
-            analysis = client.analyze_progress_text(question_answers)
-        except LLMClientError as exc:
-            return Response(
-                {"error": "LLM analysis failed", "message": str(exc)},
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
-
+        
+        # Only validate and analyze if question_answers were provided (not initial save)
         request_data = request.data.copy()
+        if question_answers:
+            is_valid_answers, feedback_message, feedback_items = LLMClient.validate_descriptive_responses(question_answers)
+            if not is_valid_answers:
+                return Response(
+                    {
+                        "error": "Validation failed",
+                        "message": feedback_message,
+                        "feedback": feedback_items,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            client = LLMClient()
+            try:
+                analysis = client.analyze_progress_text(question_answers)
+            except LLMClientError as exc:
+                return Response(
+                    {"error": "LLM analysis failed", "message": str(exc)},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+            request_data['excitement'] = analysis.get('excitement')
+            request_data['frustration'] = analysis.get('frustration')
+            request_data['anger'] = analysis.get('anger')
+        
         request_data['question_answers'] = question_answers
-        request_data['excitement'] = analysis.get('excitement')
-        request_data['frustration'] = analysis.get('frustration')
-        request_data['anger'] = analysis.get('anger')
 
         user_data = UserData.objects.create(user=user)
         # Update user data with new information

@@ -35,6 +35,7 @@ Add \android to .gitignore in RN folder
 -npx expo-doctor
 	Should now pass all checks
 
+Steps to send notifications to local Development app
 Run frontend and backend
 If frontend terminal says "Using Development build" press S to switch to expo go
 Install expo go app on phone, and login
@@ -42,10 +43,13 @@ Scan QR code with phone camera, select open in expo go
 Go to backend Django terminal
 Look for 'push_token': 'ExponentPushToken[]' and copy what is between the []
 Replacing YOUR_COPIED_TOKEN below with the value you copied earlier
+Find the user id for the account you are logged into by going into the Django dashboard and clicing users
+Put that user id replacing it with the default 1 inside mock_get_tokens at 'user_id': 
 Open new terminal in Django folder
 - venv\Scripts\activate
 - python manage.py shell
 Paste the following:
+
 from app.utils import send_notification, cache
 
 # 1. Clear the cache so it doesn't think the score hasn't changed
@@ -53,7 +57,7 @@ cache.delete('last_score')
 
 # 2. Mock the token retrieval temporarily
 def mock_get_tokens():
-    return [{'push_token': 'ExponentPushToken[YOUR_COPIED_TOKEN]', 'user_id': 1}]
+    return [{'push_token': 'ExponentPushToken[iD2ZXOFkSBnimjkK3s4nF9]', 'user_id': 20}]
 
 # 3. Temporarily override the function for this test session
 import app.utils
