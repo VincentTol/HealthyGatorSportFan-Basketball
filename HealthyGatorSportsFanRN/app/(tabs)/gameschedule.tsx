@@ -39,6 +39,18 @@ const DATE_FILTERS: { key: DateFilterKey; label: string; days?: number }[] = [
   { key: "all", label: "All" },
 ];
 
+/** NCAA tournament window (local): Selection Sunday through championship week. */
+const isMarchMadnessSeason = (now: Date = new Date()): boolean => {
+  const y = now.getFullYear();
+  const start = new Date(y, 2, 15);
+  const end = new Date(y, 3, 10);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  return now >= start && now <= end;
+};
+
+const isUfGame = (g: Game) => g.homeTeam === "Florida" || g.awayTeam === "Florida";
+
 export default function GameSchedule() {
   const insets = useSafeAreaInsets();
   const [bottomH, setBottomH] = useState(0);
@@ -79,6 +91,10 @@ export default function GameSchedule() {
     const earliest = new Date(now.getTime() - config.days * 24 * 60 * 60 * 1000);
     return gameDate <= now && gameDate >= earliest;
   });
+
+  const upcomingUfGames = data.filter((g) => isUfGame(g) && isFuture(g.startDate));
+  const showMarchMadnessKnockout =
+    !loading && !error && isMarchMadnessSeason() && upcomingUfGames.length === 0;
 
   return (
 
@@ -127,6 +143,12 @@ export default function GameSchedule() {
             })}
           </View>
 
+          {showMarchMadnessKnockout && filteredGames.length > 0 && (
+            <View style={styles.mmNotice} accessibilityRole="text">
+              <Text style={styles.mmNoticeText}>UF has been knocked out of March Madness.</Text>
+            </View>
+          )}
+
           {loading && (
             <View style={styles.stateBox}>
               <ActivityIndicator size="small" />
@@ -140,7 +162,11 @@ export default function GameSchedule() {
           )}
           {!loading && !error && filteredGames.length === 0 && (
             <View style={styles.stateBox}>
-              <Text style={styles.stateText}>No games found.</Text>
+              <Text style={styles.stateText}>
+                {showMarchMadnessKnockout
+                  ? "UF has been knocked out of March Madness."
+                  : "No games found."}
+              </Text>
             </View>
           )}
 
@@ -347,7 +373,22 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   stateBox: { paddingTop: 40, alignItems: "center" },
-  stateText: { color: "#6B7280", marginTop: 8 },
+  stateText: { color: "#6B7280", marginTop: 8, textAlign: "center", paddingHorizontal: 16 },
+  mmNotice: {
+    backgroundColor: "#FFF4ED",
+    borderWidth: 1,
+    borderColor: "#FDBA74",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+  },
+  mmNoticeText: {
+    color: "#9A3412",
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
+  },
   card: {
     backgroundColor: "white",
     borderRadius: 18,
