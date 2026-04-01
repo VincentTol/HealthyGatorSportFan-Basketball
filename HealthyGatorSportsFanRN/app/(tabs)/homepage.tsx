@@ -17,7 +17,13 @@ import { TeamLogo } from '@/components/getTeamImages';
 import User from '@/components/user';
 import { AppUrls } from '@/constants/AppUrls';
 import { Abbreviations } from '@/constants/Abbreviations';
+import {
+  MARCH_MADNESS_KNOCKOUT_MESSAGE,
+  ScheduleGameRow,
+  shouldShowMarchMadnessKnockout,
+} from '@/constants/marchMadness';
 import GlobalStyles from '../styles/GlobalStyles';
+import { getSchedule } from '@/app/(tabs)/gameschedule';
 import { registerForPushNotificationsAsync } from './notifications';
 import { clearTokens } from "@/components/tokenStorage";
 
@@ -35,6 +41,8 @@ export default function HomePage() {
   const padBottom = bottomH + 24; 
 
   const [loading, setLoading] = useState(false);
+  const [scheduleGames, setScheduleGames] = useState<ScheduleGameRow[]>([]);
+  const [scheduleLoadError, setScheduleLoadError] = useState(false);
 
   // next game data
   const [gameData, setGameData] = useState({
@@ -49,17 +57,25 @@ export default function HomePage() {
   useEffect(() => {
     const fetchGameData = async () => {
       setLoading(true);
+      setScheduleLoadError(false);
       try {
-        const data = await getNextGame();
-        if (data) {
+        const [nextData, schedResp] = await Promise.all([getNextGame(), getSchedule()]);
+        if (nextData) {
           setGameData({
-            home_team: data.home_team,
-            away_team: data.away_team,
-            date: data.date,
+            home_team: nextData.home_team,
+            away_team: nextData.away_team,
+            date: nextData.date,
           });
+        }
+        if (schedResp && 'data' in schedResp && schedResp.data) {
+          setScheduleGames(schedResp.data as ScheduleGameRow[]);
+        } else {
+          setScheduleGames([]);
+          setScheduleLoadError(true);
         }
       } catch (e) {
         console.error('Error fetching game data:', e);
+        setScheduleLoadError(true);
       } finally {
         setLoading(false);
       }
@@ -87,6 +103,11 @@ export default function HomePage() {
 
   // block back gesture
   usePreventRemove(true, () => {});
+
+  const showMarchMadnessKnockout = shouldShowMarchMadnessKnockout(scheduleGames, {
+    loading,
+    error: scheduleLoadError,
+  });
 
   // goal helpers
   function GetGoals(): string {
@@ -132,8 +153,24 @@ export default function HomePage() {
 
       <ScrollView contentContainerStyle={{ paddingBottom: padBottom }} showsVerticalScrollIndicator={false}>
         <View style={styles.centerStack}>
-          <View style={[styles.card, styles.gameCard]}>
+          {showMarchMadnessKnockout && (
+            <View style={styles.mmNotice} accessibilityRole="text">
+              <Text style={styles.mmNoticeLabel}>🏀 March Madness</Text>
+              <Text style={styles.mmNoticeText}>{MARCH_MADNESS_KNOCKOUT_MESSAGE}</Text>
+            </View>
+          )}
+
+          <View
+            style={[
+              styles.card,
+              styles.gameCard,
+              showMarchMadnessKnockout && styles.gameCardMmAccent,
+            ]}
+          >
             <Text style={styles.sectionTitle}>Next Game</Text>
+            {showMarchMadnessKnockout && (
+              <Text style={styles.mmCardHint}>No upcoming tournament games on the schedule</Text>
+            )}
             <View style={styles.underline} />
 
             {!!gameData.date && (
@@ -451,6 +488,41 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
 
+  mmNotice: {
+    backgroundColor: '#FFF4ED',
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    borderLeftWidth: 5,
+    borderLeftColor: '#FA4616',
+  },
+  mmNoticeLabel: {
+    color: '#9A3412',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  mmNoticeText: {
+    color: '#7C2D12',
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 21,
+  },
+  mmCardHint: {
+    color: '#C2410C',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 2,
+    marginBottom: 2,
+  },
+
   card: {
     backgroundColor: 'white',
     borderRadius: 16,
@@ -465,6 +537,12 @@ const styles = StyleSheet.create({
   },
 
   gameCard: { paddingBottom: 18 },
+  gameCardMmAccent: {
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    borderLeftWidth: 5,
+    borderLeftColor: '#FA4616',
+  },
 
   sectionTitle: {
     fontSize: 22,

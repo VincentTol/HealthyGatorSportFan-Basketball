@@ -15,6 +15,10 @@ import { TeamLogo } from "@/components/getTeamImages";
 import User from "@/components/user";
 import { AppUrls } from "@/constants/AppUrls";
 import { Abbreviations } from "@/constants/Abbreviations";
+import {
+  MARCH_MADNESS_KNOCKOUT_MESSAGE,
+  shouldShowMarchMadnessKnockout,
+} from "@/constants/marchMadness";
 import GlobalStyles from "../styles/GlobalStyles";
 import { clearTokens } from "@/components/tokenStorage";
 
@@ -38,18 +42,6 @@ const DATE_FILTERS: { key: DateFilterKey; label: string; days?: number }[] = [
   { key: "60d", label: "60D", days: 60 },
   { key: "all", label: "All" },
 ];
-
-/** NCAA tournament window (local): Selection Sunday through championship week. */
-const isMarchMadnessSeason = (now: Date = new Date()): boolean => {
-  const y = now.getFullYear();
-  const start = new Date(y, 2, 15);
-  const end = new Date(y, 3, 10);
-  start.setHours(0, 0, 0, 0);
-  end.setHours(23, 59, 59, 999);
-  return now >= start && now <= end;
-};
-
-const isUfGame = (g: Game) => g.homeTeam === "Florida" || g.awayTeam === "Florida";
 
 export default function GameSchedule() {
   const insets = useSafeAreaInsets();
@@ -92,9 +84,10 @@ export default function GameSchedule() {
     return gameDate <= now && gameDate >= earliest;
   });
 
-  const upcomingUfGames = data.filter((g) => isUfGame(g) && isFuture(g.startDate));
-  const showMarchMadnessKnockout =
-    !loading && !error && isMarchMadnessSeason() && upcomingUfGames.length === 0;
+  const showMarchMadnessKnockout = shouldShowMarchMadnessKnockout(data, {
+    loading,
+    error: !!error,
+  });
 
   return (
 
@@ -145,7 +138,7 @@ export default function GameSchedule() {
 
           {showMarchMadnessKnockout && filteredGames.length > 0 && (
             <View style={styles.mmNotice} accessibilityRole="text">
-              <Text style={styles.mmNoticeText}>UF has been knocked out of March Madness.</Text>
+              <Text style={styles.mmNoticeText}>{MARCH_MADNESS_KNOCKOUT_MESSAGE}</Text>
             </View>
           )}
 
@@ -163,9 +156,7 @@ export default function GameSchedule() {
           {!loading && !error && filteredGames.length === 0 && (
             <View style={styles.stateBox}>
               <Text style={styles.stateText}>
-                {showMarchMadnessKnockout
-                  ? "UF has been knocked out of March Madness."
-                  : "No games found."}
+                {showMarchMadnessKnockout ? MARCH_MADNESS_KNOCKOUT_MESSAGE : "No games found."}
               </Text>
             </View>
           )}
