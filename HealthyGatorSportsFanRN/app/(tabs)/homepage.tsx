@@ -20,6 +20,7 @@ import { Abbreviations } from '@/constants/Abbreviations';
 import GlobalStyles from '../styles/GlobalStyles';
 import { registerForPushNotificationsAsync } from './notifications';
 import { clearTokens } from "@/components/tokenStorage";
+import NotificationBell from "@/components/NotificationBell";
 
 
 const TAB_VISUAL_H = 64;
@@ -117,17 +118,13 @@ export default function HomePage() {
         <Text style={{ fontSize: 26, fontWeight: '800', color: '#003DA5' }}>
           Hey, {currentUser.firstName}!
         </Text>
-        <TouchableOpacity
-          style={GlobalStyles.topIcons}
-          activeOpacity={0.5}
-          onPress={() => NavigateToNotifications(currentUser, navigation)}
-        >
-          <Image
-            source={require('./../../assets/images/bell.png')}
-            style={{ width: 40, height: 40, alignSelf: 'center' }}
-            resizeMode="contain"
+        <View style={GlobalStyles.topIcons}>
+          <NotificationBell
+            currentUserId={currentUser?.userId}
+            onPress={() => NavigateToNotifications(currentUser, navigation)}
+            size={40}
           />
-        </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: padBottom }} showsVerticalScrollIndicator={false}>

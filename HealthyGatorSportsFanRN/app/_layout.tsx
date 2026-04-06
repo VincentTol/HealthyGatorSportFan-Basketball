@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { ensureNotificationsConfigured } from '@/components/notifications/setupNotifications';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -17,6 +18,7 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
+    ensureNotificationsConfigured();
     if (loaded) {
       SplashScreen.hideAsync();
     }

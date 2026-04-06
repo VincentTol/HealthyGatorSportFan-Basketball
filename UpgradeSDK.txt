@@ -40,11 +40,11 @@ Run frontend and backend
 If frontend terminal says "Using Development build" press S to switch to expo go
 Install expo go app on phone, and login
 Scan QR code with phone camera, select open in expo go
-Go to backend Django terminal
+Go to the frontend terminal where you ran the frontend
 Look for 'push_token': 'ExponentPushToken[]' and copy what is between the []
 Replacing YOUR_COPIED_TOKEN below with the value you copied earlier
-Find the user id for the account you are logged into by going into the Django dashboard and clicing users
-Put that user id replacing it with the default 1 inside mock_get_tokens at 'user_id': 
+Find the user id next to that push_token value
+Copy that as well, and paste below where it says 'user_id'
 Open new terminal in Django folder
 - venv\Scripts\activate
 - python manage.py shell
@@ -57,7 +57,7 @@ cache.delete('last_score')
 
 # 2. Mock the token retrieval temporarily
 def mock_get_tokens():
-    return [{'push_token': 'ExponentPushToken[iD2ZXOFkSBnimjkK3s4nF9]', 'user_id': 20}]
+    return [{'push_token': 'ExponentPushToken[YOUR_COPIED_TOKEN]', 'user_id': 1}]
 
 # 3. Temporarily override the function for this test session
 import app.utils

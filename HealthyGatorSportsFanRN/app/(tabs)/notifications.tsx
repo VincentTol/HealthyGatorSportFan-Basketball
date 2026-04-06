@@ -276,13 +276,7 @@ function NavigateToProcessLogging(currentUser: any, navigation: any) {
   navigation.navigate("ProcessLogging", { currentUser } as never);
 }
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+// Notification handler is configured at app startup in `components/notifications/setupNotifications.ts`.
 
 async function sendPushNotification(expoPushToken: string, title: string, body: string) {
   const message = { to: expoPushToken, sound: "default", title, body };
