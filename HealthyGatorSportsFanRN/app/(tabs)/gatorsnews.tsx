@@ -16,6 +16,7 @@ import User from "@/components/user";
 import { AppUrls } from "@/constants/AppUrls";
 import GlobalStyles from "../styles/GlobalStyles";
 import { clearTokens } from "@/components/tokenStorage";
+import NotificationBell from "@/components/NotificationBell";
 
 type NewsArticle = {
   title: string;
@@ -85,20 +86,15 @@ export default function GatorsNews() {
             resizeMode="contain"
           />
           <Text style={styles.headerTitle}>Gators News</Text>
-          <TouchableOpacity
-            style={GlobalStyles.topIcons}
-            activeOpacity={0.5}
-            onPress={() =>
-              currentUser &&
-              navigation.navigate("NotificationsPage", { currentUser } as never)
-            }
-          >
-            <Image
-              source={require("../../assets/images/bell.png")}
-              style={{ width: 40, height: 40, alignSelf: "center" }}
-              resizeMode="contain"
+          <View style={GlobalStyles.topIcons}>
+            <NotificationBell
+              currentUserId={currentUser?.userId}
+              onPress={() =>
+                currentUser && navigation.navigate("NotificationsPage", { currentUser } as never)
+              }
+              size={40}
             />
-          </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView

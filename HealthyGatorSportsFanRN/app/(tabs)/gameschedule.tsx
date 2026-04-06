@@ -17,6 +17,7 @@ import { AppUrls } from "@/constants/AppUrls";
 import { Abbreviations } from "@/constants/Abbreviations";
 import GlobalStyles from "../styles/GlobalStyles";
 import { clearTokens } from "@/components/tokenStorage";
+import NotificationBell from "@/components/NotificationBell";
 
 type Game = {
   week: number;
@@ -89,17 +90,13 @@ export default function GameSchedule() {
           <Text style={{ fontSize: 25, fontFamily: "System", color: colors.ufBlue, fontWeight: "700" }}>
             Game Schedule
           </Text>
-          <TouchableOpacity
-            style={GlobalStyles.topIcons}
-            activeOpacity={0.5}
-            onPress={() => NavigateToNotifications(currentUser, navigation)}
-          >
-            <Image
-              source={require('./../../assets/images/bell.png')}
-              style={{ width: 40, height: 40, alignSelf: 'center' }}
-              resizeMode="contain"
-          />
-          </TouchableOpacity>
+          <View style={GlobalStyles.topIcons}>
+            <NotificationBell
+              currentUserId={currentUser?.userId}
+              onPress={() => NavigateToNotifications(currentUser, navigation)}
+              size={40}
+            />
+          </View>
         </View>
 
         <ScrollView

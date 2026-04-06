@@ -21,6 +21,7 @@ import User from '@/components/user';
 import { AppUrls } from '@/constants/AppUrls';
 import GlobalStyles from '../styles/GlobalStyles';
 import { clearTokens } from "@/components/tokenStorage";
+import NotificationBell from "@/components/NotificationBell";
 
 const TAB_VISUAL_H = 64; 
 
@@ -92,17 +93,13 @@ export default function ProfileManagement() {
           <Text style={{ fontSize: 24, fontWeight: '700' }}>Hey, {currentUser.firstName}!</Text>
           <Text style={{ color: '#667085', marginTop: 2 }}>Manage your profile & goals</Text>
         </View>
-        <TouchableOpacity
-          style={GlobalStyles.topIcons}
-          activeOpacity={0.5}
-          onPress={() => NavigateToNotifications(currentUser, navigation)}
-        >
-          <Image
-            source={require('./../../assets/images/bell.png')}
-            style={{ width: 40, height: 40, alignSelf: 'center' }}
-            resizeMode="contain"
+        <View style={GlobalStyles.topIcons}>
+          <NotificationBell
+            currentUserId={currentUser?.userId}
+            onPress={() => NavigateToNotifications(currentUser, navigation)}
+            size={40}
           />
-        </TouchableOpacity>
+        </View>
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">

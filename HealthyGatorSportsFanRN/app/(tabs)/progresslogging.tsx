@@ -20,6 +20,7 @@ import { AppUrls } from '@/constants/AppUrls';
 import { DEFAULT_PROGRESS_QUESTIONS, ProgressQuestion } from '@/constants/ProgressQuestions';
 import GlobalStyles from '../styles/GlobalStyles';
 import { clearTokens } from "@/components/tokenStorage";
+import NotificationBell from "@/components/NotificationBell";
 
 const TAB_VISUAL_H = 64;
 const DEFAULT_MAX_CHARS = 250;
@@ -116,17 +117,13 @@ export default function ProgressLogging() {
       >
         <Image source={require('./../../assets/images/clipboardgator.png')} style={{ width: 55, height: 55 }} />
         <Text style={{ fontSize: 25, fontFamily: 'System', color: '#0021A5' }}>Enter Progress</Text>
-        <TouchableOpacity
-          style={GlobalStyles.topIcons}
-          activeOpacity={0.5}
-          onPress={() => NavigateToNotifications(currentUser, navigation)}
-        >
-          <Image
-            source={require('./../../assets/images/bell.png')}
-            style={{ width: 40, height: 40, alignSelf: 'center' }}
-            resizeMode="contain"
+        <View style={GlobalStyles.topIcons}>
+          <NotificationBell
+            currentUserId={currentUser?.userId}
+            onPress={() => NavigateToNotifications(currentUser, navigation)}
+            size={40}
           />
-        </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: padBottom }} showsVerticalScrollIndicator={false}>
