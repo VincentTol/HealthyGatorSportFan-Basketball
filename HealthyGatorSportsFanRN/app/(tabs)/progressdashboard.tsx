@@ -6,7 +6,6 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
-  Image,
   Alert,
   Platform,
   StatusBar,
@@ -22,9 +21,17 @@ type UserDataPoint = {
   user: number;
   timestamp: string;
   goal_type: string;
-  weight_value: number | null;
+  /** API may send DecimalField as a string (DRF default). */
+  weight_value: number | string | null;
   feel_better_value: number | null;
 };
+
+/** DRF serializes DecimalField as string in JSON; mood is IntegerField so it stays a number. */
+function numericWeight(value: number | string | null | undefined): number | null {
+  if (value == null || value === '') return null;
+  const n = typeof value === 'number' ? value : parseFloat(String(value));
+  return Number.isFinite(n) ? n : null;
+}
 
 export default function ProgressDashboard() {
   const navigation = useNavigation<any>();
@@ -73,9 +80,9 @@ export default function ProgressDashboard() {
     fetchAllUserData();
   }, [currentUser.userId]);
 
-  const { weightEntries, moodEntries, weightScale } = useMemo(() => {
+  const { weightEntries, moodEntries } = useMemo(() => {
     const weightEntries = entries
-      .filter((e) => typeof e.weight_value === 'number')
+      .filter((e) => numericWeight(e.weight_value) != null)
       .slice()
       .reverse();
 
@@ -84,19 +91,7 @@ export default function ProgressDashboard() {
       .slice()
       .reverse();
 
-    let min = Infinity;
-    let max = -Infinity;
-    weightEntries.forEach((e) => {
-      const w = e.weight_value ?? 0;
-      if (w < min) min = w;
-      if (w > max) max = w;
-    });
-
-    return {
-      weightEntries,
-      moodEntries,
-      weightScale: { min, max },
-    };
+    return { weightEntries, moodEntries };
   }, [entries]);
 
   const formatDate = (iso: string) => {
@@ -109,17 +104,6 @@ export default function ProgressDashboard() {
       hour: 'numeric',
       minute: '2-digit',
     });
-  };
-
-  const getWeightWidth = (value: number | null) => {
-    if (value == null) return '10%';
-    const { min, max } = weightScale;
-    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
-      return '60%';
-    }
-    const ratio = (value - min) / (max - min);
-    const clamped = Math.max(0.1, Math.min(1, ratio));
-    return `${Math.round(clamped * 100)}%`;
   };
 
   const handleBackToHome = () => {
@@ -193,24 +177,15 @@ export default function ProgressDashboard() {
             {weightEntries.length === 0 ? (
               <Text style={styles.subtleText}>You have no weight entries yet.</Text>
             ) : (
-              weightEntries.map((entry) => (
-                <View key={entry.data_id} style={styles.rowItem}>
-                  <View style={styles.rowLabel}>
+              weightEntries.map((entry) => {
+                const w = numericWeight(entry.weight_value);
+                return (
+                  <View key={entry.data_id} style={styles.weightRow}>
                     <Text style={styles.rowTitle}>{formatDate(entry.timestamp)}</Text>
-                    <Text style={styles.rowSubtitle}>{entry.weight_value} lbs</Text>
+                    <Text style={styles.rowSubtitle}>{w} lbs</Text>
                   </View>
-                  <View style={styles.rowBarTrack}>
-                    <View
-                      style={[
-                        styles.rowBarFill,
-                        {
-                          width: getWeightWidth(entry.weight_value) as any,
-                        },
-                      ]}
-                    />
-                  </View>
-                </View>
-              ))
+                );
+              })
             )}
           </View>
 
@@ -323,16 +298,18 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 2,
   },
+  weightRow: {
+    marginTop: 12,
+    paddingBottom: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E7EB',
+  },
   rowBarTrack: {
     flex: 1,
     height: 10,
     borderRadius: 999,
     backgroundColor: '#E5E7EB',
     overflow: 'hidden',
-  },
-  rowBarFill: {
-    height: '100%',
-    backgroundColor: '#FA4616',
   },
   rowBarFillMood: {
     height: '100%',
