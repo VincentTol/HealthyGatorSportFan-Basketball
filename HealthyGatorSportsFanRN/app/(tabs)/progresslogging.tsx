@@ -131,6 +131,7 @@ export default function ProgressLogging() {
     if (rating !== 0) return true;
     if (Object.keys(questionAnswers).length > 0) return true;
     return newWeight !== baselineWeight;
+    return newWeight !== baselineWeight;
   }
   usePreventRemove(dataEntered(), () => {});
 

@@ -37,6 +37,27 @@ from app.views import (
     AnalyzeProgressTextView,
     QuestionBankView,
 )
+from app.views import (
+    index,
+    CreateUserView,
+    poll_cfbd_view,
+    home_tile_view,
+    schedule_view,
+    CreateUserDataView,
+    NotificationListView,
+    CreateNotificationView,
+    DeleteNotificationView,
+    BulkDeleteNotificationsView,
+    UserLoginView,
+    LatestUserDataView,
+    AllUserDataView,
+    UserUpdateView,
+    CheckEmailView,
+    me_view,
+    news_view,
+    AnalyzeProgressTextView,
+    QuestionBankView
+)
 
 # Import drf-yasg components
 from drf_yasg.views import get_schema_view 
