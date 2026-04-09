@@ -26,6 +26,7 @@ import User from "@/components/user";
 import { AppUrls } from "@/constants/AppUrls";
 import GlobalStyles from "../styles/GlobalStyles";
 import { clearTokens } from "@/components/tokenStorage";
+import NotificationBell from "@/components/NotificationBell";
 
 type ProgressQuestion = {
   question_id: string | number;
@@ -206,6 +207,7 @@ export default function ProgressLogging() {
           },
         ]}
       >
+<<<<<<< HEAD
         <Image
           source={require("./../../assets/images/clipboardgator.png")}
           style={{ width: 55, height: 55 }}
@@ -222,8 +224,17 @@ export default function ProgressLogging() {
             source={require("./../../assets/images/bell.png")}
             style={{ width: 40, height: 40, alignSelf: "center" }}
             resizeMode="contain"
+=======
+        <Image source={require('./../../assets/images/clipboardgator.png')} style={{ width: 55, height: 55 }} />
+        <Text style={{ fontSize: 25, fontFamily: 'System', color: '#0021A5' }}>Enter Progress</Text>
+        <View style={GlobalStyles.topIcons}>
+          <NotificationBell
+            currentUserId={currentUser?.userId}
+            onPress={() => NavigateToNotifications(currentUser, navigation)}
+            size={40}
+>>>>>>> main
           />
-        </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView

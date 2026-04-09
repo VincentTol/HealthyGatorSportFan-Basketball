@@ -17,9 +17,16 @@ import { TeamLogo } from '@/components/getTeamImages';
 import User from '@/components/user';
 import { AppUrls } from '@/constants/AppUrls';
 import { Abbreviations } from '@/constants/Abbreviations';
+import {
+  MARCH_MADNESS_KNOCKOUT_MESSAGE,
+  ScheduleGameRow,
+  shouldShowMarchMadnessKnockout,
+} from '@/constants/marchMadness';
 import GlobalStyles from '../styles/GlobalStyles';
+import { getSchedule } from '@/app/(tabs)/gameschedule';
 import { registerForPushNotificationsAsync } from './notifications';
 import { clearTokens } from "@/components/tokenStorage";
+import NotificationBell from "@/components/NotificationBell";
 
 
 const TAB_VISUAL_H = 64;
@@ -35,6 +42,8 @@ export default function HomePage() {
   const padBottom = bottomH + 24; 
 
   const [loading, setLoading] = useState(false);
+  const [scheduleGames, setScheduleGames] = useState<ScheduleGameRow[]>([]);
+  const [scheduleLoadError, setScheduleLoadError] = useState(false);
 
   // next game data
   const [gameData, setGameData] = useState({
@@ -49,17 +58,25 @@ export default function HomePage() {
   useEffect(() => {
     const fetchGameData = async () => {
       setLoading(true);
+      setScheduleLoadError(false);
       try {
-        const data = await getNextGame();
-        if (data) {
+        const [nextData, schedResp] = await Promise.all([getNextGame(), getSchedule()]);
+        if (nextData) {
           setGameData({
-            home_team: data.home_team,
-            away_team: data.away_team,
-            date: data.date,
+            home_team: nextData.home_team,
+            away_team: nextData.away_team,
+            date: nextData.date,
           });
+        }
+        if (schedResp && 'data' in schedResp && schedResp.data) {
+          setScheduleGames(schedResp.data as ScheduleGameRow[]);
+        } else {
+          setScheduleGames([]);
+          setScheduleLoadError(true);
         }
       } catch (e) {
         console.error('Error fetching game data:', e);
+        setScheduleLoadError(true);
       } finally {
         setLoading(false);
       }
@@ -87,6 +104,11 @@ export default function HomePage() {
 
   // block back gesture
   usePreventRemove(true, () => {});
+
+  const showMarchMadnessKnockout = shouldShowMarchMadnessKnockout(scheduleGames, {
+    loading,
+    error: scheduleLoadError,
+  });
 
   // goal helpers
   function GetGoals(): string {
@@ -117,62 +139,74 @@ export default function HomePage() {
         <Text style={{ fontSize: 26, fontWeight: '800', color: '#003DA5' }}>
           Hey, {currentUser.firstName}!
         </Text>
-        <TouchableOpacity
-          style={GlobalStyles.topIcons}
-          activeOpacity={0.5}
-          onPress={() => NavigateToNotifications(currentUser, navigation)}
-        >
-          <Image
-            source={require('./../../assets/images/bell.png')}
-            style={{ width: 40, height: 40, alignSelf: 'center' }}
-            resizeMode="contain"
+        <View style={GlobalStyles.topIcons}>
+          <NotificationBell
+            currentUserId={currentUser?.userId}
+            onPress={() => NavigateToNotifications(currentUser, navigation)}
+            size={40}
           />
-        </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: padBottom }} showsVerticalScrollIndicator={false}>
         <View style={styles.centerStack}>
-          <View style={[styles.card, styles.gameCard]}>
+          <View
+            style={[
+              styles.card,
+              styles.gameCard,
+              showMarchMadnessKnockout && styles.gameCardMmAccent,
+            ]}
+          >
             <Text style={styles.sectionTitle}>Next Game</Text>
             <View style={styles.underline} />
 
-            {!!gameData.date && (
-              <View style={styles.chipsRow}>
-                <View style={styles.chip}>
-                  <Text style={styles.chipText}>{countdownText ?? '—'}</Text>
+            {showMarchMadnessKnockout ? (
+              <View style={styles.mmInCard} accessibilityRole="text">
+                <Text style={styles.mmNoticeLabel}>🏀 March Madness</Text>
+                <Text style={styles.mmNoticeText}>{MARCH_MADNESS_KNOCKOUT_MESSAGE}</Text>
+                <Text style={styles.mmSubtext}>No upcoming tournament games on the schedule</Text>
+              </View>
+            ) : (
+              <>
+                {!!gameData.date && (
+                  <View style={styles.chipsRow}>
+                    <View style={styles.chip}>
+                      <Text style={styles.chipText}>{countdownText ?? '—'}</Text>
+                    </View>
+                  </View>
+                )}
+
+                <View style={styles.teamsRow}>
+                  <View style={styles.teamSide}>
+                    {loading ? (
+                      <Text>Loading…</Text>
+                    ) : HomeLogo ? (
+                      <Image source={HomeLogo} style={styles.teamLogo} resizeMode="contain" />
+                    ) : (
+                      <Text>No Logo</Text>
+                    )}
+                  </View>
+
+                  <View style={styles.vsBlock}>
+                    <Text style={styles.matchupText}>
+                      {gameData.home_team || '—'} <Text style={{ color: '#FA4616', fontWeight: '800' }}>vs</Text>{' '}
+                      {gameData.away_team || '—'}
+                    </Text>
+                    <Text style={styles.dateText}>{gameData.date || ''}</Text>
+                  </View>
+
+                  <View style={styles.teamSide}>
+                    {loading ? (
+                      <Text>Loading…</Text>
+                    ) : AwayLogo ? (
+                      <Image source={AwayLogo} style={styles.teamLogo} resizeMode="contain" />
+                    ) : (
+                      <Text>No Logo</Text>
+                    )}
+                  </View>
                 </View>
-              </View>
+              </>
             )}
-
-            <View style={styles.teamsRow}>
-              <View style={styles.teamSide}>
-                {loading ? (
-                  <Text>Loading…</Text>
-                ) : HomeLogo ? (
-                  <Image source={HomeLogo} style={styles.teamLogo} resizeMode="contain" />
-                ) : (
-                  <Text>No Logo</Text>
-                )}
-              </View>
-
-              <View style={styles.vsBlock}>
-                <Text style={styles.matchupText}>
-                  {gameData.home_team || '—'} <Text style={{ color: '#FA4616', fontWeight: '800' }}>vs</Text>{' '}
-                  {gameData.away_team || '—'}
-                </Text>
-                <Text style={styles.dateText}>{gameData.date || ''}</Text>
-              </View>
-
-              <View style={styles.teamSide}>
-                {loading ? (
-                  <Text>Loading…</Text>
-                ) : AwayLogo ? (
-                  <Image source={AwayLogo} style={styles.teamLogo} resizeMode="contain" />
-                ) : (
-                  <Text>No Logo</Text>
-                )}
-              </View>
-            </View>
           </View>
 
           <View style={styles.quickRow}>
@@ -451,6 +485,39 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
 
+  mmInCard: {
+    marginTop: 4,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    backgroundColor: '#FFF4ED',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+  },
+  mmNoticeLabel: {
+    color: '#9A3412',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  mmNoticeText: {
+    color: '#7C2D12',
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  mmSubtext: {
+    color: '#C2410C',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 10,
+    lineHeight: 18,
+  },
+
   card: {
     backgroundColor: 'white',
     borderRadius: 16,
@@ -465,6 +532,12 @@ const styles = StyleSheet.create({
   },
 
   gameCard: { paddingBottom: 18 },
+  gameCardMmAccent: {
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    borderLeftWidth: 5,
+    borderLeftColor: '#FA4616',
+  },
 
   sectionTitle: {
     fontSize: 22,

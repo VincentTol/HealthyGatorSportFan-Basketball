@@ -15,8 +15,13 @@ import { TeamLogo } from "@/components/getTeamImages";
 import User from "@/components/user";
 import { AppUrls } from "@/constants/AppUrls";
 import { Abbreviations } from "@/constants/Abbreviations";
+import {
+  MARCH_MADNESS_KNOCKOUT_MESSAGE,
+  shouldShowMarchMadnessKnockout,
+} from "@/constants/marchMadness";
 import GlobalStyles from "../styles/GlobalStyles";
 import { clearTokens } from "@/components/tokenStorage";
+import NotificationBell from "@/components/NotificationBell";
 
 type Game = {
   week: number;
@@ -80,6 +85,11 @@ export default function GameSchedule() {
     return gameDate <= now && gameDate >= earliest;
   });
 
+  const showMarchMadnessKnockout = shouldShowMarchMadnessKnockout(data, {
+    loading,
+    error: !!error,
+  });
+
   return (
 
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -89,17 +99,13 @@ export default function GameSchedule() {
           <Text style={{ fontSize: 25, fontFamily: "System", color: colors.ufBlue, fontWeight: "700" }}>
             Game Schedule
           </Text>
-          <TouchableOpacity
-            style={GlobalStyles.topIcons}
-            activeOpacity={0.5}
-            onPress={() => NavigateToNotifications(currentUser, navigation)}
-          >
-            <Image
-              source={require('./../../assets/images/bell.png')}
-              style={{ width: 40, height: 40, alignSelf: 'center' }}
-              resizeMode="contain"
-          />
-          </TouchableOpacity>
+          <View style={GlobalStyles.topIcons}>
+            <NotificationBell
+              currentUserId={currentUser?.userId}
+              onPress={() => NavigateToNotifications(currentUser, navigation)}
+              size={40}
+            />
+          </View>
         </View>
 
         <ScrollView
@@ -127,6 +133,12 @@ export default function GameSchedule() {
             })}
           </View>
 
+          {showMarchMadnessKnockout && filteredGames.length > 0 && (
+            <View style={styles.mmNotice} accessibilityRole="text">
+              <Text style={styles.mmNoticeText}>{MARCH_MADNESS_KNOCKOUT_MESSAGE}</Text>
+            </View>
+          )}
+
           {loading && (
             <View style={styles.stateBox}>
               <ActivityIndicator size="small" />
@@ -140,7 +152,9 @@ export default function GameSchedule() {
           )}
           {!loading && !error && filteredGames.length === 0 && (
             <View style={styles.stateBox}>
-              <Text style={styles.stateText}>No games found.</Text>
+              <Text style={styles.stateText}>
+                {showMarchMadnessKnockout ? MARCH_MADNESS_KNOCKOUT_MESSAGE : "No games found."}
+              </Text>
             </View>
           )}
 
@@ -347,7 +361,22 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   stateBox: { paddingTop: 40, alignItems: "center" },
-  stateText: { color: "#6B7280", marginTop: 8 },
+  stateText: { color: "#6B7280", marginTop: 8, textAlign: "center", paddingHorizontal: 16 },
+  mmNotice: {
+    backgroundColor: "#FFF4ED",
+    borderWidth: 1,
+    borderColor: "#FDBA74",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+  },
+  mmNoticeText: {
+    color: "#9A3412",
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
+  },
   card: {
     backgroundColor: "white",
     borderRadius: 18,
