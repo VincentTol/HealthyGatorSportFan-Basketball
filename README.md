@@ -1,3 +1,12 @@
+This branch includes modifications to utils.py that insert a 15-minute cooldown on notifications and sends a notification when the game ends. This behavior may already be covered by celery beat. If so, this branch can be deleted
+
+
+
+
+
+
+
+
 # HealthyGatorSportsFan
 Senior Project / JITAI application 2024
 
