@@ -207,6 +207,24 @@ export default function ProgressLogging() {
           },
         ]}
       >
+<<<<<<< HEAD
+        <Image
+          source={require("./../../assets/images/clipboardgator.png")}
+          style={{ width: 55, height: 55 }}
+        />
+        <Text style={{ fontSize: 25, fontFamily: "System", color: "#0021A5" }}>
+          Enter Progress
+        </Text>
+        <TouchableOpacity
+          style={GlobalStyles.topIcons}
+          activeOpacity={0.5}
+          onPress={() => NavigateToNotifications(currentUser, navigation)}
+        >
+          <Image
+            source={require("./../../assets/images/bell.png")}
+            style={{ width: 40, height: 40, alignSelf: "center" }}
+            resizeMode="contain"
+=======
         <Image source={require('./../../assets/images/clipboardgator.png')} style={{ width: 55, height: 55 }} />
         <Text style={{ fontSize: 25, fontFamily: 'System', color: '#0021A5' }}>Enter Progress</Text>
         <View style={GlobalStyles.topIcons}>
@@ -214,6 +232,7 @@ export default function ProgressLogging() {
             currentUserId={currentUser?.userId}
             onPress={() => NavigateToNotifications(currentUser, navigation)}
             size={40}
+>>>>>>> main
           />
         </View>
       </View>
