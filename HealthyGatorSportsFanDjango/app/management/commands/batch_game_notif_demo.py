@@ -2,39 +2,39 @@
 Send a scripted burst of health notifications for local device testing (Expo Go / dev build).
 
 Mirrors the flow in UpgradeSDK.txt: mock push token + user_id, then call send_notification.
-Rewinds the 15-minute throttle between non-final steps so every snapshot sends in one run.
+Clears the score cache so the scripted sequence sends every step (send_notification only
+pushes when the cached score string changes).
 
 Usage (from HealthyGatorSportsFanDjango with venv active):
   python manage.py batch_game_notif_demo --push-token "ExponentPushToken[...]" --user-id 1
   python manage.py batch_game_notif_demo ... --delay-minutes 0.5   # 30 seconds between pushes
 """
 import time
-from datetime import datetime, timezone, timedelta
 
 import app.utils
 from django.core.cache import cache
 from django.core.management.base import BaseCommand, CommandError
 
-from app.utils import (
-    send_notification,
-    HEALTH_NOTIF_LAST_SENT_KEY,
-    HEALTH_NOTIF_GAME_CTX_KEY,
-    HEALTH_NOTIF_FINAL_SIG_KEY,
-    HEALTH_NOTIF_MIN_INTERVAL,
-    _HEALTH_NOTIF_CACHE_TTL,
-)
+from app.utils import send_notification
 
 
 def _clear_demo_cache():
     cache.delete("last_score")
-    cache.delete(HEALTH_NOTIF_GAME_CTX_KEY)
-    cache.delete(HEALTH_NOTIF_LAST_SENT_KEY)
-    cache.delete(HEALTH_NOTIF_FINAL_SIG_KEY)
 
 
-def _rewind_throttle():
-    t = datetime.now(timezone.utc) - HEALTH_NOTIF_MIN_INTERVAL - timedelta(minutes=1)
-    cache.set(HEALTH_NOTIF_LAST_SENT_KEY, t.isoformat(), timeout=_HEALTH_NOTIF_CACHE_TTL)
+def _patch_cache_get_for_send_notification(real_get):
+    """
+    send_notification decodes last_score from cache as bytes; Django often returns str.
+    Wrap reads so .decode() in utils succeeds without changing utils.py.
+    """
+
+    def mock_cache_get(key, *args, **kwargs):
+        val = real_get(key, *args, **kwargs)
+        if key == "last_score" and isinstance(val, str):
+            return val.encode("utf-8")
+        return val
+
+    return mock_cache_get
 
 
 # Florida at home vs Georgia; scores and statuses mimic a game progressing in ~15-minute beats.
@@ -110,28 +110,21 @@ class Command(BaseCommand):
             return [{"push_token": token, "user_id": user_id}]
 
         real_get_users = app.utils.get_users_with_push_token
+        real_cache_get = cache.get
         app.utils.get_users_with_push_token = mock_get_tokens
+        cache.get = _patch_cache_get_for_send_notification(real_cache_get)
 
         try:
             for i, (label, status, home, hs, away, aws) in enumerate(DEMO_SEQUENCE):
                 self.stdout.write(f"Sending [{label}] {status} ({home} {hs}, {away} {aws})")
                 send_notification(status, home, hs, away, aws)
                 is_final = i == len(DEMO_SEQUENCE) - 1
-                if not is_final:
-                    try:
-                        _rewind_throttle()
-                    except Exception as e:
-                        self.stdout.write(
-                            self.style.WARNING(
-                                "Could not rewind 15-minute throttle in cache; the next step may be skipped. %s"
-                                % e
-                            )
-                        )
-                    if delay_minutes > 0:
-                        delay_sec = delay_minutes * 60.0
-                        self.stdout.write(f"Waiting {delay_minutes} min ({delay_sec:g} s) before next notification...")
-                        time.sleep(delay_sec)
+                if not is_final and delay_minutes > 0:
+                    delay_sec = delay_minutes * 60.0
+                    self.stdout.write(f"Waiting {delay_minutes} min ({delay_sec:g} s) before next notification...")
+                    time.sleep(delay_sec)
         finally:
+            cache.get = real_cache_get
             app.utils.get_users_with_push_token = real_get_users
 
         self.stdout.write(self.style.SUCCESS("Done. Sent %d notifications." % len(DEMO_SEQUENCE)))

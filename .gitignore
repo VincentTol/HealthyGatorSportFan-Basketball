@@ -28,10 +28,10 @@ HealthyGatorSportsFanDjango/celerybeat-schedule.dat
 HealthyGatorSportsFanDjango/celerybeat-schedule.dir
 
 # Ignore AppUrls.ts file so Host URL changes can be made locally without disrupting default Heroku URL for app in production
-HealthyGatorSportsFanRN\constants\AppUrls.ts
+HealthyGatorSportsFanRN/constants/AppUrls.ts
 
 # Ignore FCM file
-HealthyGatorSportsFanRN\google-services.json
+HealthyGatorSportsFanRN/google-services.json
 
 #Ignore Virtual environment
 venv/
