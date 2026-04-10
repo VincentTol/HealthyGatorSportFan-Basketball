@@ -4,7 +4,7 @@ import logging
 import re
 import requests
 import xml.etree.ElementTree as ET
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 from .models import User, NotificationData
 from .serializers import UserSerializer
 from django.core.cache import cache
@@ -13,6 +13,66 @@ logger = logging.getLogger(__name__)
 
 # NCAA API (basketball live scores): https://ncaa-api.henrygd.me
 NCAA_SCOREBOARD_URL = "https://ncaa-api.henrygd.me/scoreboard/basketball-men/d1"
+
+# In-game health notifications: at most once per interval; always once when game reaches final.
+HEALTH_NOTIF_MIN_INTERVAL = timedelta(minutes=15)
+HEALTH_NOTIF_GAME_CTX_KEY = "health_notif_game_ctx"
+HEALTH_NOTIF_LAST_SENT_KEY = "health_notif_last_sent_at"
+HEALTH_NOTIF_FINAL_SIG_KEY = "health_notif_final_signature"
+_HEALTH_NOTIF_CACHE_TTL = 60 * 60 * 12
+_FINAL_GAME_STATUSES = frozenset({
+    "won_decisive", "won_close", "lost_close", "lost_decisive",
+})
+
+
+def _cache_str(value):
+    if value is None:
+        return None
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    return str(value)
+
+
+def _should_send_health_notification(game_status, home_team, away_team, home_score, away_score):
+    """
+    Return True if a push should go out: always for a new final scoreline (end of game),
+    otherwise at most once per HEALTH_NOTIF_MIN_INTERVAL for that matchup.
+    """
+    if game_status == "No game found":
+        return False
+
+    game_ctx = f"{home_team}|{away_team}"
+    prev_ctx = _cache_str(cache.get(HEALTH_NOTIF_GAME_CTX_KEY))
+    if prev_ctx != game_ctx:
+        cache.set(HEALTH_NOTIF_GAME_CTX_KEY, game_ctx, timeout=_HEALTH_NOTIF_CACHE_TTL)
+        cache.delete(HEALTH_NOTIF_LAST_SENT_KEY)
+        cache.delete(HEALTH_NOTIF_FINAL_SIG_KEY)
+
+    if game_status in _FINAL_GAME_STATUSES:
+        sig = f"{game_ctx}|{home_score}|{away_score}|final"
+        prev_sig = _cache_str(cache.get(HEALTH_NOTIF_FINAL_SIG_KEY))
+        return prev_sig != sig
+
+    now = datetime.now(timezone.utc)
+    raw_last = cache.get(HEALTH_NOTIF_LAST_SENT_KEY)
+    if raw_last is None:
+        return True
+    try:
+        last_sent = datetime.fromisoformat(_cache_str(raw_last))
+    except (TypeError, ValueError):
+        return True
+    if last_sent.tzinfo is None:
+        last_sent = last_sent.replace(tzinfo=timezone.utc)
+    return (now - last_sent) >= HEALTH_NOTIF_MIN_INTERVAL
+
+
+def _mark_health_notification_sent(game_status, home_team, away_team, home_score, away_score):
+    game_ctx = f"{home_team}|{away_team}"
+    now = datetime.now(timezone.utc)
+    if game_status in _FINAL_GAME_STATUSES:
+        sig = f"{game_ctx}|{home_score}|{away_score}|final"
+        cache.set(HEALTH_NOTIF_FINAL_SIG_KEY, sig, timeout=_HEALTH_NOTIF_CACHE_TTL)
+    cache.set(HEALTH_NOTIF_LAST_SENT_KEY, now.isoformat(), timeout=_HEALTH_NOTIF_CACHE_TTL)
 
 
 def get_basketball_season_range(reference_dt=None):
@@ -236,18 +296,14 @@ def send_notification(game_status: str, home_team: str, home_score: int, away_te
             'No game found': ''
         }[game_status]
         print(f"Game status: {game_status}")
-        current_score = f"{home_score}-{away_score}"
-        last_score = cache.get('last_score')
-        print(f"Last score: {last_score}")
-        if game_status == 'No game found':
+        if game_status == "No game found":
             return
-        else:
-            last_score = last_score.decode('utf-8') if last_score is not None else ""
-            if game_status == 'Game not started':
-                current_score = "Game not started"
-            if last_score != current_score:
-                send_push_notification_next_game("Health Notification", pushTokens, message)
-                cache.set('last_score', current_score)
+        if not _should_send_health_notification(
+            game_status, home_team, away_team, home_score, away_score
+        ):
+            return
+        send_push_notification_next_game("Health Notification", pushTokens, message)
+        _mark_health_notification_sent(game_status, home_team, away_team, home_score, away_score)
 
 
 # News: Google News RSS (free, no API key, no limit).
