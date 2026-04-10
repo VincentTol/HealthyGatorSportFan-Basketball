@@ -44,9 +44,15 @@ def _should_send_health_notification(game_status, home_team, away_team, home_sco
     game_ctx = f"{home_team}|{away_team}"
     prev_ctx = _cache_str(cache.get(HEALTH_NOTIF_GAME_CTX_KEY))
     if prev_ctx != game_ctx:
-        cache.set(HEALTH_NOTIF_GAME_CTX_KEY, game_ctx, timeout=_HEALTH_NOTIF_CACHE_TTL)
-        cache.delete(HEALTH_NOTIF_LAST_SENT_KEY)
-        cache.delete(HEALTH_NOTIF_FINAL_SIG_KEY)
+        try:
+            cache.set(HEALTH_NOTIF_GAME_CTX_KEY, game_ctx, timeout=_HEALTH_NOTIF_CACHE_TTL)
+            cache.delete(HEALTH_NOTIF_LAST_SENT_KEY)
+            cache.delete(HEALTH_NOTIF_FINAL_SIG_KEY)
+        except Exception as e:
+            logger.warning(
+                "Health notification cache reset failed (e.g. Redis MISCONF); throttling may be stale: %s",
+                e,
+            )
 
     if game_status in _FINAL_GAME_STATUSES:
         sig = f"{game_ctx}|{home_score}|{away_score}|final"
@@ -69,10 +75,17 @@ def _should_send_health_notification(game_status, home_team, away_team, home_sco
 def _mark_health_notification_sent(game_status, home_team, away_team, home_score, away_score):
     game_ctx = f"{home_team}|{away_team}"
     now = datetime.now(timezone.utc)
-    if game_status in _FINAL_GAME_STATUSES:
-        sig = f"{game_ctx}|{home_score}|{away_score}|final"
-        cache.set(HEALTH_NOTIF_FINAL_SIG_KEY, sig, timeout=_HEALTH_NOTIF_CACHE_TTL)
-    cache.set(HEALTH_NOTIF_LAST_SENT_KEY, now.isoformat(), timeout=_HEALTH_NOTIF_CACHE_TTL)
+    try:
+        if game_status in _FINAL_GAME_STATUSES:
+            sig = f"{game_ctx}|{home_score}|{away_score}|final"
+            cache.set(HEALTH_NOTIF_FINAL_SIG_KEY, sig, timeout=_HEALTH_NOTIF_CACHE_TTL)
+        cache.set(HEALTH_NOTIF_LAST_SENT_KEY, now.isoformat(), timeout=_HEALTH_NOTIF_CACHE_TTL)
+    except Exception as e:
+        logger.warning(
+            "Health notification cache update failed after push (e.g. Redis MISCONF / disk full); "
+            "users may get duplicate notifications until Redis accepts writes again: %s",
+            e,
+        )
 
 
 def get_basketball_season_range(reference_dt=None):
