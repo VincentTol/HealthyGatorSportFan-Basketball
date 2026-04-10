@@ -4,7 +4,8 @@ import logging
 import re
 import requests
 import xml.etree.ElementTree as ET
-from datetime import date, datetime, timezone
+import json
+from datetime import date, datetime, timedelta, timezone
 from .models import User, NotificationData
 from .serializers import UserSerializer
 from django.core.cache import cache
@@ -13,6 +14,12 @@ logger = logging.getLogger(__name__)
 
 # NCAA API (basketball live scores): https://ncaa-api.henrygd.me
 NCAA_SCOREBOARD_URL = "https://ncaa-api.henrygd.me/scoreboard/basketball-men/d1"
+
+# Live score push throttling: notify on significant change, or at most every 15 minutes (timer resets on significant send).
+SCORE_NOTIFY_MIN_INTERVAL = timedelta(minutes=15)
+SCORE_NOTIFY_SIGNIFICANT_MARGIN_DELTA = 8  # points change vs last notified snapshot
+SCORE_NOTIFY_CACHE_KEY = "score_notify_throttle_v1"
+SCORE_NOTIFY_CACHE_TTL = 60 * 60 * 24 * 7  # 1 week; state is replaced on each send
 
 
 def get_basketball_season_range(reference_dt=None):
@@ -217,6 +224,107 @@ def check_game_status_basketball(scoreboard=None, curr_team_override=None):
         return "Game not started", home_name, 0, away_name, 0, "scheduled"
 
 
+def _florida_margin_and_lead_category(home_team: str, away_team: str, home_score: int, away_score: int):
+    """Margin = Florida score minus opponent (same team matching as check_game_status_basketball)."""
+    curr = (os.environ.get("CURR_TEAM", "Florida") or "Florida").strip()
+    hn = (home_team or "").strip()
+    an = (away_team or "").strip()
+    if hn == curr or curr in hn:
+        margin = home_score - away_score
+    elif an == curr or curr in an:
+        margin = away_score - home_score
+    else:
+        margin = home_score - away_score
+    if margin > 0:
+        lead_cat = 1
+    elif margin < 0:
+        lead_cat = -1
+    else:
+        lead_cat = 0
+    return margin, lead_cat
+
+
+def _score_notify_load_state():
+    raw = cache.get(SCORE_NOTIFY_CACHE_KEY)
+    if raw is None:
+        return None, None
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8")
+    try:
+        data = json.loads(raw) if isinstance(raw, str) else raw
+        at_raw = data.get("last_notified_at")
+        snap = data.get("snapshot")
+        last_at = datetime.fromisoformat(at_raw) if at_raw else None
+        if last_at and last_at.tzinfo is None:
+            last_at = last_at.replace(tzinfo=timezone.utc)
+        return last_at, snap
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return None, None
+
+
+def _score_notify_save_state(last_notified_at: datetime, snapshot: dict):
+    if last_notified_at.tzinfo is None:
+        last_notified_at = last_notified_at.replace(tzinfo=timezone.utc)
+    cache.set(
+        SCORE_NOTIFY_CACHE_KEY,
+        json.dumps({
+            "last_notified_at": last_notified_at.isoformat(),
+            "snapshot": snapshot,
+        }),
+        timeout=SCORE_NOTIFY_CACHE_TTL,
+    )
+
+
+def _coarse_notify_bucket(game_status: str) -> str:
+    """
+    Collapse fine-grained statuses (e.g. winning_decisive vs winning_close) so the score
+    crossing the 14-point decisive/close boundary does not count as a new notification.
+    Same for won/lost decisive vs close.
+    """
+    if game_status in ("winning_decisive", "winning_close"):
+        return "live_winning"
+    if game_status in ("losing_decisive", "losing_close"):
+        return "live_losing"
+    if game_status == "tied":
+        return "live_tied"
+    if game_status in ("won_decisive", "won_close"):
+        return "final_win"
+    if game_status in ("lost_decisive", "lost_close"):
+        return "final_loss"
+    if game_status == "Game not started":
+        return "pregame"
+    if game_status in ("predicted_win", "predicted_lose"):
+        return game_status
+    if game_status == "No game found":
+        return "none"
+    return game_status
+
+
+def _is_significant_score_notification(prev_snapshot: dict | None, game_status: str, margin: int):
+    """
+    Significant if coarse situation changes (winning vs tied vs losing vs final, etc.),
+    or margin moved a lot since the last push — not when only decisive/close flips within the same side.
+    First live/final snapshot after no prior notify counts as significant.
+    """
+    if game_status in ("No game found",):
+        return False
+    coarse = _coarse_notify_bucket(game_status)
+    if prev_snapshot is None:
+        return game_status not in ("Game not started",)
+
+    prev_coarse = prev_snapshot.get("coarse_bucket")
+    if prev_coarse is None:
+        prev_gs = prev_snapshot.get("game_status")
+        prev_coarse = _coarse_notify_bucket(prev_gs) if prev_gs else None
+
+    if prev_coarse is not None and coarse != prev_coarse:
+        return True
+    prev_margin = prev_snapshot.get("margin")
+    if prev_margin is not None and abs(margin - prev_margin) >= SCORE_NOTIFY_SIGNIFICANT_MARGIN_DELTA:
+        return True
+    return False
+
+
 def send_notification(game_status: str, home_team: str, home_score: int, away_team: str, away_score: int):
     pushTokens = get_users_with_push_token()
     if pushTokens:
@@ -235,19 +343,44 @@ def send_notification(game_status: str, home_team: str, home_score: int, away_te
             'Game not started': "The game hasn't started yet. Get ready to meet your health goals when it does!",
             'No game found': ''
         }[game_status]
-        print(f"Game status: {game_status}")
-        current_score = f"{home_score}-{away_score}"
-        last_score = cache.get('last_score')
-        print(f"Last score: {last_score}")
-        if game_status == 'No game found':
+        if game_status == "No game found":
             return
-        else:
-            last_score = last_score.decode('utf-8') if last_score is not None else ""
-            if game_status == 'Game not started':
-                current_score = "Game not started"
-            if last_score != current_score:
-                send_push_notification_next_game("Health Notification", pushTokens, message)
-                cache.set('last_score', current_score)
+
+        margin, lead_cat = _florida_margin_and_lead_category(home_team, away_team, home_score, away_score)
+        snapshot = {
+            "game_status": game_status,
+            "coarse_bucket": _coarse_notify_bucket(game_status),
+            "margin": margin,
+            "lead_cat": lead_cat,
+            "home_score": home_score,
+            "away_score": away_score,
+        }
+
+        last_notified_at, prev_snapshot = _score_notify_load_state()
+        now = datetime.now(timezone.utc)
+        significant = _is_significant_score_notification(prev_snapshot, game_status, margin)
+        timer_elapsed = (
+            last_notified_at is not None
+            and (now - last_notified_at) >= SCORE_NOTIFY_MIN_INTERVAL
+        )
+
+        if not significant and not timer_elapsed:
+            logger.debug(
+                "Score notification skipped (not significant, interval not elapsed): status=%s margin=%s",
+                game_status,
+                margin,
+            )
+            return
+
+        reason = "significant_change" if significant else "interval"
+        logger.info(
+            "Sending score notification (%s): game_status=%s margin=%s",
+            reason,
+            game_status,
+            margin,
+        )
+        send_push_notification_next_game("Health Notification", pushTokens, message)
+        _score_notify_save_state(now, snapshot)
 
 
 # News: Google News RSS (free, no API key, no limit).
