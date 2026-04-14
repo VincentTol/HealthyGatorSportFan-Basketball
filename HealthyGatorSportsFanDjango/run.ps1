@@ -168,7 +168,7 @@ if (Get-Command ngrok -ErrorAction SilentlyContinue) {
     Start-Process powershell -ArgumentList @(
         "-NoExit",
         "-ExecutionPolicy", "Bypass",
-        "-Command", "Set-Location '$PSScriptRoot'; ngrok http 8000 --url https://interprofessionally-nonappeasable-garfield.ngrok-free.dev"
+        "-Command", "Set-Location '$PSScriptRoot'; ngrok http 8000 --url nannie-halogenous-tidily.ngrok-free.dev" # Replace with your ngrok subdomain for local testing
     )
 } else {
     Write-Warning "ngrok is not on PATH; skipping ngrok startup."

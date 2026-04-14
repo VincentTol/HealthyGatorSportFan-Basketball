@@ -5,6 +5,8 @@ Mirrors the flow in UpgradeSDK.txt: mock push token + user_id, then call send_no
 Clears the score cache so the scripted sequence sends every step (send_notification only
 pushes when the cached score string changes).
 
+You can find the push token in the Django terminal logs as well as the user id when you login
+
 Usage (from HealthyGatorSportsFanDjango with venv active):
   python manage.py batch_game_notif_demo --push-token "ExponentPushToken[...]" --user-id 1
   python manage.py batch_game_notif_demo ... --delay-minutes 0.5   # 30 seconds between pushes
