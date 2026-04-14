@@ -21,6 +21,7 @@ import {
   MARCH_MADNESS_KNOCKOUT_MESSAGE,
   ScheduleGameRow,
   shouldShowMarchMadnessKnockout,
+  shouldShowNoUpcomingGames,
 } from '@/constants/marchMadness';
 import GlobalStyles from '../styles/GlobalStyles';
 import { getSchedule } from '@/app/(tabs)/gameschedule';
@@ -110,6 +111,11 @@ export default function HomePage() {
     error: scheduleLoadError,
   });
 
+  const showNoUpcomingGames = shouldShowNoUpcomingGames(scheduleGames, {
+    loading,
+    error: scheduleLoadError,
+  });
+
   // goal helpers
   function GetGoals(): string {
     if (currentUser.feelBetter && currentUser.loseWeight) return 'Lose weight and feel better';
@@ -165,6 +171,12 @@ export default function HomePage() {
                 <Text style={styles.mmNoticeLabel}>🏀 March Madness</Text>
                 <Text style={styles.mmNoticeText}>{MARCH_MADNESS_KNOCKOUT_MESSAGE}</Text>
                 <Text style={styles.mmSubtext}>No upcoming tournament games on the schedule</Text>
+              </View>
+            ) : showNoUpcomingGames ? (
+              <View style={styles.mmInCard} accessibilityRole="text">
+                <Text style={styles.mmNoticeLabel}>🏀 UF Basketball</Text>
+                <Text style={styles.mmNoticeText}>No upcoming games scheduled.</Text>
+                <Text style={styles.mmSubtext}>Check back later for the next game!</Text>
               </View>
             ) : (
               <>
@@ -289,8 +301,8 @@ export default function HomePage() {
               <Text style={styles.ctaText}>View Progress Dashboard</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.cta} onPress={demoGameNotifications}>
-              <Text onPress={() => {Linking.openURL('https://ufl.qualtrics.com/jfe/form/SV_3V4CndUea1oyhXE')}} style={styles.ctaText}>Take Post-Game Survey</Text>
+            <TouchableOpacity style={styles.cta}>
+              <Text onPress={() => {Linking.openURL('https://ufl.qualtrics.com/jfe/form/SV_3qpPbrBPm4YtjwO')}} style={styles.ctaText}>Take Post-Game Survey</Text>
             </TouchableOpacity>
 
           </View>
@@ -401,9 +413,6 @@ export const getNextGame = async () => {
   }
 };
 
-const demoGameNotifications = async () => {
-  // TODO: mock scoreboard & dummy polling if needed
-};
 
 const toDate = (s: string) => {
   if (!s) return null;
