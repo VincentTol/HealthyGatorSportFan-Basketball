@@ -29,7 +29,12 @@ Once they accept the invitation, go to [the tester management screen](https://ap
 
 ### Backend
 
-#### Option 1: Run Locally (on Windows)
+#### Option 1: Run on Heroku (recommended)
+This app runs on a Heroku server in production. No specific action is required to start up the backend if you plan on using Heroku.
+- Index: https://healthygatorsportsfan-84ee3c84673f.herokuapp.com
+- Django admin view: https://healthygatorsportsfan-84ee3c84673f.herokuapp.com/admin
+
+#### Option 2: Run Locally (on Windows)
 If you want to develop and test backend code changes locally, you can run the backend on ngrok, Django server, Redis server, Celery worker, and Celery beat scheduler. First you'll need to clone the repo and install the necessary prerequisites.
 
 ##### Step 0: Prerequisite downloads and installations
@@ -37,34 +42,11 @@ If you want to develop and test backend code changes locally, you can run the ba
 1. Install Python and Pip
    - Download the latest version of Python from https://www.python.org/downloads/ 
    - Ensure the latest version of pip is installed by running `py -m ensurepip –upgrade` in the terminal.
-2. Install Packages 
-    1. Open the Django project folder:
-        - `HealthyGatorSportFan-Basketball/HealthyGatorSportsFanDjango`
-    2. Run the setup script:
-        - `./setup.ps1`
-        - Configure the Django `.env` file:
-            - `SECRET_KEY`
-            - Do not change this; it is generated uniquely during setup.
-            - `DATABASE_NAME`
-            - Use `healthygatorsportsfan` (per project instructions).
-            - `DATABASE_USER`
-            - PostgreSQL user created in pgAdmin (`Login/Group Roles`) with DB access.
-            - `DATABASE_PASSWORD`
-            - Password for the PostgreSQL user.
-            - `DATABASE_HOST`
-            - Usually `localhost` (PostgreSQL running on your machine).
-    3. Open the RN project folder:
-        - `HealthyGatorSportFan-Basketball/HealthyGatorSportsFanRN`
-    4. Configure frontend API URL:
-        - Open `HealthyGatorSportFan-Basketball/HealthyGatorSportsFanRN/constants/AppUrls.ts`.
-        - Set the URL to your Django/ngrok URL.
-    5. Install frontend dependencies:
-        - Run `./setup.ps1`
-        - You should see a setup complete message if install succeeds.
-    6. Confirm VS Code uses the Django venv interpreter:
-        - Set Python interpreter to this project’s `venv`.
-	    - This should resolve import errors.
-1. Install PostgreSQL on computer
+
+1. Install Django
+   - You can install Django by running the command `python -m pip install Django` in the terminal. Instructions can be found here: https://docs.djangoproject.com/en/5.1/topics/install/#installing-official-release or here: https://docs.djangoproject.com/en/5.1/intro/install/#install-django.
+
+1. Install PostgreSQL
     - Download https://www.postgresql.org/download/windows/.
     - In the terminal from the **HealthyGatorSportsFan** directory run `python -m pip install psycopg2`
     - Open pgAdmin4 (from Windows Start menu) and login with the password you made when downloading PostgreSQL.
@@ -73,6 +55,19 @@ If you want to develop and test backend code changes locally, you can run the ba
         - Right click databases and create “healthygatorsportsfan”. Set the owner to yourself.
     - Navigate to the **HealthyGatorSportsFanDjango** directory and run `python manage.py migrate` then `python manage.py createsuperuser?`
     - From the **HealthyGatorSportsFanDjango** directory run `python manage.py runserver`, and open the link. Navigate to http://localhost:8000/admin and log in with your superuser credentials.
+
+1. Install CORS for Django
+   - Navigate to the **HealthyGatorSportsFanDjango** directory and run `pip install django-cors-headers`. This allows for ExpoGo to connect to the local server on the backend
+  
+1. Install College Football Data API and other needed modules
+   - Navigate to the **HealthyGatorSportsFanDjango** directory and run:
+     - `python -m pip install cfbd==5.3.3a1` (click [here](https://github.com/CFBD/cfbd-python/tree/next?tab=readme-ov-file#installation--usage) for more information)
+     - `python -m pip install pytz`
+     - `python -m pip install exponent-server-sdk`
+
+1. Install OpenAPI SARTBEAR Swagger generation tool for Django Rest Framework
+   - Navigate to the **HealthyGatorSportsFanDjango** directory and run `pip install drf-yasg`
+
 1. Set up Ngrok
    - Follow Steps 1-4 in these instructions: [Quickstart | ngrok documentation](https://ngrok.com/docs/getting-started/?os=windows). Use port 8000 instead of 8080. And be sure to create a static domain (step 4). Here is an excerpt with some tweaks for our use case:
      - **Step 1: Install** - Run this command in an Administrator Command Prompt: `choco install ngrok`, or [download the ngrok agent from their Download page](https://download.ngrok.com/) if you can't use one of the options above. The ngrok agent is a zero-dependency CLI program that runs on all major operating systems. Test that you installed it correctly by running `ngrok help` in your terminal and confirm that ngrok prints its help text.
@@ -96,15 +91,13 @@ If you want to develop and test backend code changes locally, you can run the ba
    - Navigate to **HealthyGatorSportsFanDjango\project\settings.py** and add your new static domain to ALLOWED_HOSTS and CSRF_TRUSTED_ORIGIN.
    - Navigate to **HealthyGatorSportsFanRN\constants\AppUrls.ts**, add your new static domain to the list. Comment out other URLs in the list. This will ensure the frontend uses this host for API calls.
 
+1. Install Celery and Redis
+   - Open a terminal in your virtual environment and run: 'python -m pip install celery redis'. This installs Celery (the task queue) and Redis (the message broker).   
 
 1. Download Redis for Windows
    - Download the .msi file (not the zip) from the [official source](https://github.com/microsoftarchive/redis/releases) and double click on it to run the installer. 
 
 Once you've completed the prerequisites, you're ready to run the application by following these steps:
-
-##### Step 0. New Method
-Navigate to **HealthyGatorSportsFanDjango\project\settings.py**
-Run `./run.ps1` in the Django folder (PowerShell).
 
 ##### Step 1. Run the Django server
 
@@ -144,17 +137,14 @@ Now the backend should be up and running locally!
 
 ### Frontend
 
-
-
 #### Option 1: Run using TestFlight
 (TODO: Complete this section)
 
 #### Option 2: Run locally using Expo Go
 
-
 ##### Step 0: Prerequisite downloads and installations
 
-Navigate to the **HealthyGatorSportsFanRN** directory and run the following (dont have to do if used setup script):
+Navigate to the **HealthyGatorSportsFanRN** directory and run the following:
 - `npm install`
 - `npx expo install react-native-web`
 - `npx expo install expo-web-browser`
@@ -164,7 +154,6 @@ Navigate to the **HealthyGatorSportsFanRN** directory and run the following (don
 
 Within the **HealthyGatorSportsFanRN** directory run:
 - `npx expo start`
-- or run `./run.ps1` in terminal
 
 #### Option 2.1: Using Expo Go CLI
 
